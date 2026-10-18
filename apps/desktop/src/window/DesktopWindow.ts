@@ -825,7 +825,9 @@ export const make = Effect.gen(function* () {
     });
 
     loadApplication();
-    if (environment.isDevelopment) {
+    // A source checkout used as the everyday app runs in development mode too;
+    // T3CODE_DESKTOP_DEVTOOLS=0 keeps the inspector closed there.
+    if (environment.isDevelopment && process.env.T3CODE_DESKTOP_DEVTOOLS !== "0") {
       window.webContents.openDevTools({ mode: "detach" });
     }
 
