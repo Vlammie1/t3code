@@ -22,6 +22,8 @@ import { PullRequestDetailPanel } from "../pullRequest/PullRequestDetailPanel";
 import { PullRequestDetailGhost } from "../pullRequest/PullRequestGhosts";
 import { PullRequestsUnavailableState } from "../pullRequest/PullRequestsUnavailableState";
 import { ThreadPullRequestsPanel } from "../pullRequest/ThreadPullRequestsPanel";
+import { SessionImagesPanel } from "../images/SessionImagesPanel";
+import type { SessionImage } from "../images/sessionImages";
 
 const PreviewPanel = lazy(() =>
   import("../preview/PreviewPanel").then((module) => ({ default: module.PreviewPanel })),
@@ -77,6 +79,7 @@ export function RightPanelSurfaceContent(props: {
   readonly terminal: RightPanelTerminalProps;
   readonly pullRequest: RightPanelPullRequestProps;
   readonly files: RightPanelFileProps;
+  readonly images: ReadonlyArray<SessionImage>;
 }) {
   const { surface, threadRef, visible } = props;
   if (surface === null) return null;
@@ -162,6 +165,8 @@ export function RightPanelSurfaceContent(props: {
     }
     case "pull-requests":
       return <ThreadPullRequestsPanel threadRef={threadRef} />;
+    case "images":
+      return <SessionImagesPanel environmentId={props.environmentId} images={props.images} />;
     case "device":
       return (
         <Suspense fallback={null}>

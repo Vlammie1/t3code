@@ -41,6 +41,8 @@ import type { UsageLimitSourceSnapshots } from "@t3tools/contracts";
 import { isUsageLimitsCommand } from "@t3tools/shared/usageLimits";
 import { feedbackBannerItem } from "./chat/ComposerFeedback";
 import { useUsageLimitsPanel } from "./chat/useUsageLimitsPanel";
+import { ComposerLimitStrip } from "./chat/ComposerLimitStrip";
+import { collectSessionImages } from "./images/sessionImages";
 import { useWorktreeSetup } from "./chat/useWorktreeSetup";
 import { useChatShortcuts, type ChatShortcutHandler } from "./chat/useChatShortcuts";
 import {
@@ -2475,6 +2477,8 @@ export default function ChatView(props: ChatViewProps) {
     offered: usageLimitsOffered,
     open: openUsageLimits,
     clearFor: clearUsageLimitsFor,
+    liveReport: usageLimitsLiveReport,
+    isOpen: usageLimitsPanelOpen,
   } = useUsageLimitsPanel({
     environmentId,
     threadKey: routeThreadKey,
@@ -2993,6 +2997,12 @@ export default function ChatView(props: ChatViewProps) {
   const activeProjectCwd = activeProject?.workspaceRoot ?? null;
   const activeThreadWorktreePath = activeThread?.worktreePath ?? null;
   const activeWorkspaceRoot = activeThreadWorktreePath ?? activeProjectCwd ?? undefined;
+  const sessionImages = activeThreadRef
+    ? collectSessionImages(timelineEntries, {
+        threadId: activeThreadRef.threadId,
+        workspaceRoot: activeWorkspaceRoot,
+      })
+    : [];
   useLayoutEffect(() => {
     if (
       threadDetailLoading ||
@@ -3646,6 +3656,10 @@ export default function ChatView(props: ChatViewProps) {
     useRightPanelStore.getState().open(activeThreadRef, "pull-requests");
   };
   const addPullRequestsSurfaceStable = useStableCallback(addPullRequestsSurface);
+  const addImagesSurfaceStable = useStableCallback(() => {
+    if (!activeThreadRef) return;
+    useRightPanelStore.getState().open(activeThreadRef, "images");
+  });
   const { state: deviceState, loaded: deviceStateLoaded } = useDeviceState(
     activeThreadRef?.environmentId ?? null,
   );
@@ -7705,6 +7719,7 @@ export default function ChatView(props: ChatViewProps) {
 
   const rightPanelContent = activeThreadRef ? (
     <RightPanelSurfaceContent
+      images={sessionImages}
       surface={renderedRightPanelSurface}
       activeSurfaceId={activeRightPanelSurface?.id ?? null}
       threadRef={activeThreadRef}
@@ -7825,7 +7840,7 @@ export default function ChatView(props: ChatViewProps) {
   const content = (
     <div
       ref={setWorkspaceLayoutElement}
-      className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-background"
+      className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden"
     >
       <DeviceSetupDialogHost
         threadKey={activeThreadKey}
@@ -7935,7 +7950,7 @@ export default function ChatView(props: ChatViewProps) {
                 }}
               />
             </div>
-            <div className="relative flex min-h-0 flex-1 flex-col bg-background">
+            <div className="relative flex min-h-0 flex-1 flex-col">
               <MessagesTimeline
                 citationRequest={paintOnlyDisplayedTimeline ? null : citationRequest}
                 citationHistoryLoading={threadDetailLoading}
@@ -8216,6 +8231,14 @@ export default function ChatView(props: ChatViewProps) {
                               }
                               isPreparingWorktree={isPreparingWorktree && !sendQueuesBehindSetup}
                               queuedRunsControl={queuedRunsControl}
+                              limitStrip={
+                                usageLimitsLiveReport !== null && !usageLimitsPanelOpen ? (
+                                  <ComposerLimitStrip
+                                    report={usageLimitsLiveReport}
+                                    onOpen={() => void openUsageLimits()}
+                                  />
+                                ) : null
+                              }
                               bannerItems={composerBannerItems}
                               resumeCompactionTokens={resumeCompactionTokens}
                               keepFullHistory={keepFullHistory}
@@ -8541,6 +8564,7 @@ export default function ChatView(props: ChatViewProps) {
           onAddFiles={addFilesSurfaceStable}
           onAddPullRequest={addPullRequestSurfaceStable}
           onAddPullRequests={addPullRequestsSurfaceStable}
+          onAddImages={addImagesSurfaceStable}
           onAddDevice={addDeviceSurfaceStable}
           browserAvailable={canOperatePreview && browserAvailable}
           terminalAvailable={activeProject !== null && canOperateTerminal}
@@ -8596,6 +8620,7 @@ export default function ChatView(props: ChatViewProps) {
             onAddFiles={addFilesSurfaceStable}
             onAddPullRequest={addPullRequestSurfaceStable}
             onAddPullRequests={addPullRequestsSurfaceStable}
+            onAddImages={addImagesSurfaceStable}
             onAddDevice={addDeviceSurfaceStable}
             browserAvailable={canOperatePreview && browserAvailable}
             terminalAvailable={activeProject !== null && canOperateTerminal}

@@ -2383,3 +2383,57 @@ code {
     }
   }
 }
+
+/* Glass chrome: one soft light field in the action colour sits behind the
+   whole app, and the sidebar and main surface let it through. The field is a
+   fixed, static background, so scrolling never repaints it; the chrome over it
+   is translucent without a backdrop filter, because nothing moves beneath it.
+   Unlayered so it outranks the `bg-sidebar` and `bg-background` utilities. */
+:root {
+  --app-light-field-strength: 16%;
+  --app-light-field:
+    radial-gradient(
+      70rem 46rem at 92% -14%,
+      color-mix(in oklab, var(--primary) var(--app-light-field-strength), transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      56rem 40rem at -12% 112%,
+      color-mix(in oklab, var(--primary) calc(var(--app-light-field-strength) * 0.7), transparent),
+      transparent 70%
+    );
+  --app-glass-chrome-opacity: calc(var(--glass-opacity) - 18%);
+}
+
+:root.dark {
+  --app-light-field-strength: 34%;
+}
+
+html {
+  background-image: var(--app-light-field);
+  background-attachment: fixed;
+}
+
+/* The canvas colour and the field both live on html; a second fill here would
+   halve the light that reaches the chrome. */
+body {
+  background-color: transparent;
+}
+
+[data-slot="sidebar-inner"],
+[data-slot="sidebar"] {
+  background-color: color-mix(
+    in srgb,
+    var(--sidebar) var(--app-glass-chrome-opacity),
+    transparent
+  ) !important;
+  box-shadow: inset -1px 0 color-mix(in srgb, var(--contrast-foreground) 6%, transparent);
+}
+
+[data-slot="sidebar-inset"] {
+  background-color: color-mix(
+    in srgb,
+    var(--background) calc(var(--glass-opacity) - 22%),
+    transparent
+  ) !important;
+}

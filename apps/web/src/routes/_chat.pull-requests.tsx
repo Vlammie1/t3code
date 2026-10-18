@@ -1683,6 +1683,7 @@ function PullRequestsRouteView() {
             onAddFiles={() => undefined}
             onAddPullRequest={() => undefined}
             onAddPullRequests={() => undefined}
+            onAddImages={() => undefined}
             onAddDevice={() => undefined}
             browserAvailable={false}
             terminalAvailable={false}

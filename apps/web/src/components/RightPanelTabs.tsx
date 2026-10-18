@@ -33,6 +33,7 @@ import {
   FileDiff,
   Files,
   Globe2,
+  Images,
   Plus,
   TerminalSquare,
 } from "lucide-react";
@@ -136,6 +137,7 @@ interface RightPanelTabsProps {
   onAddFiles: () => void;
   onAddPullRequest: () => void;
   onAddPullRequests: () => void;
+  onAddImages: () => void;
   onAddDevice: () => void;
   browserAvailable: boolean;
   terminalAvailable: boolean;
@@ -172,6 +174,7 @@ const SURFACE_DISABLED_REASONS = {
   pullRequest: "This thread's branch has no pull request yet.",
   pullRequests: "No linked pull requests are available for this thread.",
   device: "Devices are only available from a thread.",
+  images: "Images are only available from a thread.",
 } as const;
 
 const LAUNCHER_SHORTCUT_BLOCKING_LAYERS = [
@@ -193,6 +196,7 @@ const SURFACE_UNAVAILABLE_HINTS = {
   pullRequest: "No pull request on this branch yet.",
   pullRequests: "No linked pull requests available.",
   device: "Available from a thread.",
+  images: "Available from a thread.",
 } as const;
 
 type TabContextMenuAction =
@@ -313,6 +317,7 @@ function RightPanelEmptyState(props: {
   onAddFiles: () => void;
   onAddPullRequest: () => void;
   onAddPullRequests: () => void;
+  onAddImages: () => void;
   onAddDevice: () => void;
   browserAvailable: boolean;
   terminalAvailable: boolean;
@@ -372,6 +377,14 @@ function RightPanelEmptyState(props: {
       available: props.pullRequestsAvailable,
       disabledReason: SURFACE_UNAVAILABLE_HINTS.pullRequests,
       onClick: props.onAddPullRequests,
+    },
+    {
+      label: "Images",
+      icon: Images,
+      shortcut: "I",
+      available: true,
+      disabledReason: SURFACE_UNAVAILABLE_HINTS.images,
+      onClick: props.onAddImages,
     },
     {
       label: "Device",
@@ -564,6 +577,8 @@ function surfaceTitle(
       return `#${surface.number}`;
     case "pull-requests":
       return "Pull requests";
+    case "images":
+      return "Images";
     case "device":
       return surface.title ?? surface.target?.name ?? "Device";
     case "preview": {
@@ -654,6 +669,8 @@ function SurfaceIcon({
       );
     case "pull-requests":
       return <PullRequestGlyph.link className="size-3 shrink-0" />;
+    case "images":
+      return <Images className="size-3 shrink-0" />;
     case "device":
       return surface.target?.platform === "ios" ? (
         <AppleIcon className="size-3 shrink-0" />
@@ -1074,6 +1091,14 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       onClick: props.onAddPullRequests,
     },
     {
+      label: "Images",
+      icon: Images,
+      shortcut: "I",
+      available: true,
+      disabledReason: SURFACE_DISABLED_REASONS.images,
+      onClick: props.onAddImages,
+    },
+    {
       label: "Device",
       icon: Smartphone,
       shortcut: "M",
@@ -1453,6 +1478,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
             onAddFiles={props.onAddFiles}
             onAddPullRequest={props.onAddPullRequest}
             onAddPullRequests={props.onAddPullRequests}
+            onAddImages={props.onAddImages}
             onAddDevice={props.onAddDevice}
             browserAvailable={props.browserAvailable}
             terminalAvailable={props.terminalAvailable}

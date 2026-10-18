@@ -6,6 +6,9 @@ import { defaultAnimateLayoutChanges, type AnimateLayoutChanges } from "@dnd-kit
 import * as Cause from "effect/Cause";
 import { AsyncResult } from "effect/reactivity";
 import {
+  EMPTY_SIDEBAR_THREAD_FILTER,
+  matchesSidebarThreadFilter,
+  sortThreadsByStatusGroup,
   animateSidebarLayoutChanges,
   archiveSelectedThreadEntries,
   buildBulkTitleRegenerationContextMenuItem,
@@ -988,6 +991,51 @@ describe("resolveSidebarThreadStatus", () => {
   it("keeps Waiting static while Working shows elapsed duration", () => {
     expect(shouldShowSidebarV2Duration("waiting")).toBe(false);
     expect(shouldShowSidebarV2Duration("working")).toBe(true);
+  });
+});
+
+describe("sortThreadsByStatusGroup", () => {
+  const running = {
+    status: "running" as const,
+    activeRunId: null,
+    providerInstanceId: ProviderInstanceId.make("codex"),
+    providerName: "Codex",
+    lastError: null,
+    updatedAt: "2026-03-09T10:00:00.000Z",
+  };
+  const base = { hasPendingApprovals: false, hasPendingUserInput: false, runtime: null };
+  const finishedA = { ...base, id: "finished-a" };
+  const asking = { ...base, id: "asking", hasPendingUserInput: true };
+  const working = { ...base, id: "working", runtime: running };
+  const finishedB = { ...base, id: "finished-b" };
+
+  it("puts running threads first, then the ones needing the user, then finished ones", () => {
+    expect(
+      sortThreadsByStatusGroup([finishedA, asking, working, finishedB]).map((thread) => thread.id),
+    ).toEqual(["working", "asking", "finished-a", "finished-b"]);
+  });
+
+  it("filters by status group and leaves everything visible without a filter", () => {
+    const threads = [finishedA, asking, working];
+    const latestRun = null;
+    const withRun = threads.map((thread) => ({
+      ...thread,
+      latestRun,
+      interactionMode: "default" as const,
+      hasActionableProposedPlan: false,
+    }));
+    expect(
+      withRun
+        .filter((thread) => matchesSidebarThreadFilter(thread, EMPTY_SIDEBAR_THREAD_FILTER))
+        .map((thread) => thread.id),
+    ).toEqual(["finished-a", "asking", "working"]);
+    expect(
+      withRun
+        .filter((thread) =>
+          matchesSidebarThreadFilter(thread, { groups: ["attention"], unreadOnly: false }),
+        )
+        .map((thread) => thread.id),
+    ).toEqual(["asking"]);
   });
 });
 

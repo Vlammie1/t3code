@@ -140,6 +140,7 @@ async function renderTabs(
         onAddTerminal={noop}
         onAddPullRequest={noop}
         onAddPullRequests={noop}
+        onAddImages={noop}
         onAddDiff={noop}
         onAddFiles={noop}
         onAddDevice={noop}

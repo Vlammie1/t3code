@@ -1602,6 +1602,8 @@ export interface ChatComposerProps {
   onPageScrollRelease: () => void;
 
   queuedRunsControl?: ReactNode;
+  /** Usage limit bars attached directly above the prompt. */
+  limitStrip?: ReactNode;
   editingQueuedAttachments: ReadonlyArray<{
     readonly attachment: ContractChatAttachment;
     readonly url: string | null;
@@ -6508,6 +6510,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
               />
             </ComposerBanner.Attachment>
           ) : null}
+          {props.limitStrip}
         </ComposerBanner.Column>
         {!isComposerApprovalState ? (
           <ComposerStashBadge

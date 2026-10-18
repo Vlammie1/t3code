@@ -213,6 +213,11 @@ import {
   type SidebarDropVerb,
   resolveSidebarThreadStatus,
   resolveThreadLastVisitedAt,
+  EMPTY_SIDEBAR_THREAD_FILTER,
+  isSidebarThreadFilterActive,
+  matchesSidebarThreadFilter,
+  sortThreadsByStatusGroup,
+  type SidebarThreadFilter,
   searchSidebarThreads,
   shouldCreateNewThreadInCurrentProject,
   shouldNavigateAfterThreadPark,
@@ -279,6 +284,7 @@ import {
 import { SidebarContent, SidebarGroup, useSidebar } from "./ui/sidebar";
 import { SidebarChromeFooter, SidebarChromeHeader } from "./sidebar/SidebarChrome";
 import { SidebarHeaderIconButton, SidebarThreadHeader } from "./sidebar/SidebarThreadHeader";
+import { SidebarThreadFilterSection } from "./sidebar/SidebarThreadFilterSection";
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuShortcut, MenuTrigger } from "./ui/menu";
 import { Tooltip, TooltipPopup, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import { MiddleTruncate } from "./ui/middle-truncate";
@@ -366,6 +372,11 @@ const SETTLED_TAIL_PAGE_COUNT = 25;
 const SETTLED_SHELF_EXPANDED_KEY = "t3code:sidebar:settled-expanded";
 const SNOOZED_SHELF_EXPANDED_KEY = "t3code:sidebar:snoozed-expanded";
 const WORKING_SHELF_EXPANDED_KEY = "t3code:sidebar:working-expanded";
+const THREAD_FILTER_KEY = "t3code:sidebar:thread-filter";
+const SidebarThreadFilterSchema = Schema.Struct({
+  groups: Schema.Array(Schema.Literals(["active", "attention", "finished"])),
+  unreadOnly: Schema.Boolean,
+});
 
 const inboxReturns = createInboxReturnTracker();
 
@@ -386,6 +397,8 @@ interface SidebarThreadPartitionInput {
   readonly serverConfigs: ReadonlyMap<EnvironmentId, EnvironmentServerConfig>;
   readonly optimisticDrop: SidebarOptimisticDrop | null;
   readonly workingShelfEnabled: boolean;
+  readonly threadFilter: SidebarThreadFilter;
+  readonly localLastVisitedAtByKey: Readonly<Record<string, string>>;
   // Snooze wakes and the queued-turn grace depend on the clock, so the minute
   // tick and the precise snooze-wake tick are inputs: a new key repartitions.
   readonly clockKey: string;
@@ -421,9 +434,11 @@ function resolveDraggedOrders(input: {
       applySidebarThreadDrop(thread, "settled", drag.occurredAt),
     ]).map(threadShellKey),
     activeOrder: workingShelfEnabled
-      ? sortInboxThreadsByReturn(
-          [...others(activeThreads), applySidebarThreadDrop(thread, "active", drag.occurredAt)],
-          inboxReturns.returnedAt,
+      ? sortThreadsByStatusGroup(
+          sortInboxThreadsByReturn(
+            [...others(activeThreads), applySidebarThreadDrop(thread, "active", drag.occurredAt)],
+            inboxReturns.returnedAt,
+          ),
         ).map(threadShellKey)
       : undefined,
   };
@@ -448,11 +463,19 @@ function useSidebarThreads(input: {
   readonly serverConfigs: ReadonlyMap<EnvironmentId, EnvironmentServerConfig>;
   readonly optimisticDrop: SidebarOptimisticDrop | null;
   readonly routeThreadKey: string | null;
+  readonly threadFilter: SidebarThreadFilter;
 }) {
-  const { projectScopeKey, scopedProjectKeys, serverConfigs, optimisticDrop, routeThreadKey } =
-    input;
+  const {
+    projectScopeKey,
+    scopedProjectKeys,
+    serverConfigs,
+    optimisticDrop,
+    routeThreadKey,
+    threadFilter,
+  } = input;
   const threads = useThreadShells();
   const workingShelfEnabled = useClientSettings((s) => s.sidebarWorkingShelfEnabled);
+  const localLastVisitedAtByKey = useUiStateStore((state) => state.threadLastVisitedAtById);
   const nowMinute = useNowMinute();
   // Snooze wake times are second-precise, so classifying with the quantized
   // minute would hold a woken thread on the shelf for up to a minute.
@@ -494,6 +517,8 @@ function useSidebarThreads(input: {
     serverConfigs,
     optimisticDrop,
     workingShelfEnabled,
+    threadFilter,
+    localLastVisitedAtByKey,
     clockKey: `${nowMinute}:${snoozeWakeTick}`,
   });
   const partitionNextWakeAt = partition.snoozedThreads[0]?.snoozedUntil ?? null;
@@ -582,9 +607,31 @@ function useSidebarThreads(input: {
 }
 
 function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
-  const { threads, scopedProjectKeys, serverConfigs, optimisticDrop, workingShelfEnabled } = input;
+  const {
+    threads,
+    scopedProjectKeys,
+    serverConfigs,
+    optimisticDrop,
+    workingShelfEnabled,
+    threadFilter,
+    localLastVisitedAtByKey,
+  } = input;
   const preciseNow = new Date().toISOString();
-  const visible = filterSidebarV2VisibleThreads(threads, scopedProjectKeys);
+  const scoped = filterSidebarV2VisibleThreads(threads, scopedProjectKeys);
+  const visible = isSidebarThreadFilterActive(threadFilter)
+    ? scoped.filter((thread) =>
+        matchesSidebarThreadFilter(
+          {
+            ...thread,
+            lastVisitedAt: resolveThreadLastVisitedAt(
+              thread.lastVisitedAt,
+              localLastVisitedAtByKey[threadShellKey(thread)],
+            ),
+          },
+          threadFilter,
+        ),
+      )
+    : scoped;
   inboxReturns.observe(workingShelfEnabled ? threads : null);
   const pinned: EnvironmentThreadShell[] = [];
   const active: EnvironmentThreadShell[] = [];
@@ -641,9 +688,13 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
   // sort, or mixed-version fleets would render different pinned orders on
   // web and mobile from the same data.
   const sortedPinned = sortPinnedThreadsForSidebar(pinned);
-  const sortedActive = workingShelfEnabled
-    ? sortInboxThreadsByReturn(active, inboxReturns.returnedAt)
-    : sortThreadsForSidebar(active);
+  // Running threads first, then the ones waiting on the user, then finished
+  // ones; each group keeps the inbox's own order.
+  const sortedActive = sortThreadsByStatusGroup(
+    workingShelfEnabled
+      ? sortInboxThreadsByReturn(active, inboxReturns.returnedAt)
+      : sortThreadsForSidebar(active),
+  );
   return {
     pinnedThreads:
       optimisticDrop?.section !== "pinned" || optimisticDrop.order === null
@@ -2794,6 +2845,11 @@ export default function Sidebar() {
   const projectGroupsRef = useRef(projectGroups);
   const persistedProjectScopeKey = useUiStateStore((store) => store.sidebarProjectScopeKey);
   const setPersistedProjectScopeKey = useUiStateStore((store) => store.setSidebarProjectScopeKey);
+  const [threadFilter, setThreadFilter] = useLocalStorage<SidebarThreadFilter, unknown>(
+    THREAD_FILTER_KEY,
+    EMPTY_SIDEBAR_THREAD_FILTER,
+    SidebarThreadFilterSchema,
+  );
   const [projectScopeMenuState, dispatchProjectScopeMenu] = useReducer(
     reduceSidebarProjectScopeMenuState,
     { open: false, query: "" },
@@ -3003,6 +3059,7 @@ export default function Sidebar() {
     serverConfigs,
     optimisticDrop,
     routeThreadKey,
+    threadFilter,
   });
 
   const isSearchingThreads = threadSearchQuery.trim().length > 0;
@@ -4569,25 +4626,38 @@ export default function Sidebar() {
                       <SidebarHeaderIconButton
                         label={
                           scopedProjectGroup
-                            ? `Filter threads by project: ${scopedProjectGroup.displayName}`
-                            : "Filter threads by project"
+                            ? `Filter threads: ${scopedProjectGroup.displayName}`
+                            : "Filter threads"
                         }
                       />
                     }
                   >
-                    {scopedProjectGroup ? (
-                      <span className="flex shrink-0">
+                    <span className="relative flex shrink-0">
+                      {scopedProjectGroup ? (
                         <ProjectFavicon project={scopedProjectGroup} className="size-4" />
-                      </span>
-                    ) : (
-                      <ListFilterIcon className="size-4" />
-                    )}
+                      ) : (
+                        <ListFilterIcon className="size-4" />
+                      )}
+                      {isSidebarThreadFilterActive(threadFilter) ? (
+                        <span
+                          aria-hidden
+                          className="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-primary ring-2 ring-sidebar"
+                        />
+                      ) : null}
+                    </span>
                   </ComboboxTrigger>
                   <ComboboxPopup
                     align="start"
                     anchor={headerSearchRef}
                     className="max-w-[min(18rem,var(--available-width))] overflow-hidden"
                   >
+                    <SidebarThreadFilterSection
+                      filter={threadFilter}
+                      onFilterChange={setThreadFilter}
+                    />
+                    <span className="px-2.5 pt-2.5 text-xs font-medium text-muted-foreground">
+                      Project
+                    </span>
                     <ComboboxSearchInput
                       aria-label="Search projects"
                       placeholder="Search projects..."

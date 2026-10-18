@@ -941,6 +941,61 @@ export function resolveSidebarThreadStatus(thread: SidebarThreadStatusInput): Si
   return "ready";
 }
 
+/**
+ * The three buckets the inbox is ordered by: what is running, what needs the
+ * user, and what is finished. Failures and usage limits count as needing the
+ * user, since nothing moves until someone acts on them.
+ */
+export type SidebarStatusGroup = "active" | "attention" | "finished";
+
+const SIDEBAR_STATUS_GROUP_RANK: Record<SidebarStatusGroup, number> = {
+  active: 0,
+  attention: 1,
+  finished: 2,
+};
+
+export function resolveSidebarStatusGroup(thread: SidebarThreadStatusInput): SidebarStatusGroup {
+  const status = resolveSidebarThreadStatus(thread);
+  if (status === "working" || status === "waiting") return "active";
+  if (status === "ready") return "finished";
+  return "attention";
+}
+
+/** Stable: rows keep their existing order inside each status group. */
+export function sortThreadsByStatusGroup<T extends SidebarThreadStatusInput>(
+  threads: readonly T[],
+): T[] {
+  return threads
+    .map((thread, index) => ({
+      thread,
+      index,
+      rank: SIDEBAR_STATUS_GROUP_RANK[resolveSidebarStatusGroup(thread)],
+    }))
+    .toSorted((left, right) => left.rank - right.rank || left.index - right.index)
+    .map((entry) => entry.thread);
+}
+
+export interface SidebarThreadFilter {
+  readonly groups: readonly SidebarStatusGroup[];
+  readonly unreadOnly: boolean;
+}
+
+export const EMPTY_SIDEBAR_THREAD_FILTER: SidebarThreadFilter = { groups: [], unreadOnly: false };
+
+export function isSidebarThreadFilterActive(filter: SidebarThreadFilter): boolean {
+  return filter.groups.length > 0 || filter.unreadOnly;
+}
+
+export function matchesSidebarThreadFilter(
+  thread: ThreadStatusInput,
+  filter: SidebarThreadFilter,
+): boolean {
+  if (filter.groups.length > 0 && !filter.groups.includes(resolveSidebarStatusGroup(thread))) {
+    return false;
+  }
+  return !filter.unreadOnly || hasUnseenCompletion(thread) || hasUnseenFailure(thread);
+}
+
 export type SidebarV2TopStatusKind =
   | "approval"
   | "done"

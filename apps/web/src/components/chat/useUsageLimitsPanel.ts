@@ -6,6 +6,7 @@ import type {
 } from "@t3tools/contracts";
 import { collectProviderUsageLimits, hasProviderUsageLimits } from "@t3tools/shared/usageLimits";
 import { useState } from "react";
+import { useNowMinute } from "../../hooks/useNowMinute";
 import { useStableCallback } from "../../hooks/useStableCallback";
 import { toastManager } from "../ui/toast";
 import { usageLimitsBannerItem } from "./ComposerUsageLimits";
@@ -63,6 +64,18 @@ export function useUsageLimitsPanel(input: {
   // elsewhere the name stays the provider's own and is sent through untouched.
   const offered =
     providerDriver !== null && hasProviderUsageLimits(providerDriver, providers, sources);
+  // Always-on summary for the strip above the composer, on the minute tick
+  // (a UTC ISO prefix without its zone) so it stays pure during render.
+  const nowMinute = useNowMinute();
+  const liveReport =
+    offered && providerInstanceId !== null && panelKey !== null
+      ? collectProviderUsageLimits(
+          providerInstanceId,
+          providers,
+          sources,
+          Date.parse(`${nowMinute}Z`),
+        )
+      : null;
 
   // Answered locally from the last Limits snapshot; the agent never sees it.
   const open = useStableCallback(() => {
@@ -86,5 +99,5 @@ export function useUsageLimitsPanel(input: {
     ),
   );
 
-  return { banner, offered, open, clearFor };
+  return { banner, offered, open, clearFor, liveReport, isOpen: report !== null };
 }
