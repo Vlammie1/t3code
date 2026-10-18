@@ -129,6 +129,14 @@ function installElectronRuntime(electronDir, version) {
     ]);
     if (hostPlatform === "darwin") {
       runChecked("ditto", ["-x", "-k", zipPath, NodePath.join(electronDir, "dist")]);
+    } else if (hostPlatform === "win32") {
+      // `python3` on Windows is usually the Microsoft Store stub. The bsdtar that
+      // ships in System32 reads zip archives; name it by path so a Git Bash or
+      // MSYS GNU tar earlier on PATH, which cannot, is never picked up.
+      const distDir = NodePath.join(electronDir, "dist");
+      NodeFS.mkdirSync(distDir, { recursive: true });
+      const systemRoot = process.env.SystemRoot ?? "C:\\Windows";
+      runChecked(NodePath.join(systemRoot, "System32", "tar.exe"), ["-xf", zipPath, "-C", distDir]);
     } else {
       runChecked("python3", [
         "-c",
