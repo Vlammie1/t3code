@@ -282,6 +282,46 @@ describe("call", () => {
     },
   );
 
+  it.effect("reads an answer without the nested fields GitHub withheld from the token", () => {
+    const { layer } = harness(() =>
+      json({
+        data: { repository: { pullRequest: null } },
+        errors: [
+          {
+            type: "FORBIDDEN",
+            path: ["repository", "pullRequest"],
+            message: "Resource not accessible by personal access token",
+          },
+        ],
+      }),
+    );
+    return Effect.gen(function* () {
+      expect(yield* callStats()).toEqual({ repository: { pullRequest: null } });
+    }).pipe(Effect.provide(layer));
+  });
+
+  it.effect("still fails a withheld root field", () => {
+    const { layer } = harness(() =>
+      json({
+        data: { repository: null },
+        errors: [
+          {
+            type: "FORBIDDEN",
+            path: ["repository"],
+            message: "Resource not accessible by personal access token",
+          },
+        ],
+      }),
+    );
+    return Effect.gen(function* () {
+      const error = yield* Effect.flip(callStats());
+      expect(error).toMatchObject({
+        _tag: "GitHubApiResponseError",
+        githubErrors: ["Resource not accessible by personal access token"],
+      });
+    }).pipe(Effect.provide(layer));
+  });
+
   it.effect("leaves an answer that does not decode to the caller", () => {
     const { layer } = harness(() =>
       json({ data: { repository: { pullRequest: { additions: "many" } } } }),

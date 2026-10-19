@@ -323,7 +323,8 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
         const current = yield* snapshot.getSnapshot;
         if (!current.enabled || !current.version || !current.usageLimits) return;
         if (current.usageLimits.unavailable) return;
-        if (!(yield* host.shouldRunBackgroundWork({ type: "provider-status", instanceId }))) return;
+        // Clients lease only the provider-wide scope: one keyed by instance would never match.
+        if (!(yield* host.shouldRunBackgroundWork({ type: "provider-status" }))) return;
         const update = yield* ClaudeResetCredits.readClaudeUsageWindows(configDir, current.version);
         if (update) {
           yield* snapshot.applyUsageLimits({

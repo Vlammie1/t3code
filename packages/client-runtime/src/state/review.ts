@@ -26,6 +26,9 @@ export function createReviewEnvironmentAtoms<R, E>(
       label: "environment-data:review:diff-preview",
       tag: WS_METHODS.reviewGetDiffPreview,
       staleTimeMs: 5_000,
+      // A collapsed diff panel unsubscribes; keeping the last diff for longer lets reopening it
+      // show that diff while it refreshes, rather than a loading state.
+      idleTtlMs: 30 * 60_000,
     }),
     diffFilePatch: createEnvironmentQueryAtomFamily(runtime, {
       label: "environment-data:review:diff-file-patch",

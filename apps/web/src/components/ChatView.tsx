@@ -147,6 +147,7 @@ import { Debouncer } from "@tanstack/react-pacer";
 import { useAtomValue } from "@effect/atom-react";
 import { Atom } from "effect/reactivity";
 import {
+  Activity,
   Fragment,
   type SetStateAction,
   useEffect,
@@ -1696,6 +1697,18 @@ export default function ChatView(props: ChatViewProps) {
   const rightPanelControlsAtRoot = rightPanelPresent && !shouldUsePlanSidebarSheet;
   const renderedRightPanelSurface = rightPanelPresence.value?.activeSurface ?? null;
   const renderedRightPanelSurfaces = rightPanelPresence.value?.surfaces ?? [];
+  // A collapsed panel that holds a diff stays mounted, hidden, so reopening it shows the same
+  // diff at the same place instead of highlighting every file again.
+  const rightPanelKeptHidden =
+    !rightPanelPresent &&
+    activeThreadRef !== null &&
+    rightPanelState.surfaces.some((surface) => surface.kind === "diff");
+  const mountedRightPanelSurface = rightPanelKeptHidden
+    ? activeRightPanelSurface
+    : renderedRightPanelSurface;
+  const mountedRightPanelSurfaces = rightPanelKeptHidden
+    ? rightPanelState.surfaces
+    : renderedRightPanelSurfaces;
   const previewMiniPlayerVisible = shouldRenderPreviewMiniPlayer(
     activePreviewMiniPlayer?.source ?? null,
     renderedRightPanelSurface,
@@ -7731,7 +7744,8 @@ export default function ChatView(props: ChatViewProps) {
   const rightPanelContent = activeThreadRef ? (
     <RightPanelSurfaceContent
       images={sessionImages}
-      surface={renderedRightPanelSurface}
+      surface={mountedRightPanelSurface}
+      hasDiffSurface={mountedRightPanelSurfaces.some((surface) => surface.kind === "diff")}
       activeSurfaceId={activeRightPanelSurface?.id ?? null}
       threadRef={activeThreadRef}
       environmentId={activeThread.environmentId}
@@ -8560,73 +8574,20 @@ export default function ChatView(props: ChatViewProps) {
         ))}
       </div>
 
-      {rightPanelPresent && !shouldUsePlanSidebarSheet && activeThreadRef ? (
-        <RightPanelTabs
-          mode="inline"
-          open={rightPanelOpen}
-          keybindings={keybindings}
-          getShortcutContext={getShortcutContextStable}
-          maximized={rightPanelMaximized}
-          inlineSize={previewPanelInlineSize}
-          surfaces={renderedRightPanelSurfaces}
-          environmentId={activeThreadRef.environmentId}
-          activeSurfaceId={renderedRightPanelSurface?.id ?? null}
-          pendingSurfaceIds={pendingFileSurfaceIds}
-          previewSessions={activePreviewState.sessions}
-          desktopByTabId={activePreviewState.desktopByTabId}
-          previewRuntimeTabId={resolvePreviewRuntimeTabId}
-          terminalLabelsById={activeTerminalLabelsById}
-          onActivate={activateRightPanelSurfaceStable}
-          onCloseSurface={closeRightPanelSurfaceStable}
-          onRenameDevice={(surfaceId, title) => {
-            if (activeThreadRef)
-              useRightPanelStore.getState().renameDevice(activeThreadRef, surfaceId, title);
-          }}
-          onCloseOtherSurfaces={closeOtherRightPanelSurfacesStable}
-          onCloseSurfacesToRight={closeRightPanelSurfacesToRightStable}
-          onCloseAllSurfaces={closeAllRightPanelSurfacesStable}
-          onMoveSurface={moveRightPanelSurfaceStable}
-          onCopyFilePath={copyRightPanelFilePathStable}
-          onAddBrowser={() => createBrowserSurface()}
-          onAddBrowserInProfile={createBrowserSurfaceStable}
-          onAddTerminal={addTerminalSurfaceStable}
-          onAddDiff={addDiffSurfaceStable}
-          onAddFiles={addFilesSurfaceStable}
-          onAddPullRequest={addPullRequestSurfaceStable}
-          onAddPullRequests={addPullRequestsSurfaceStable}
-          onAddImages={addImagesSurfaceStable}
-          onAddDevice={addDeviceSurfaceStable}
-          browserAvailable={canOperatePreview && browserAvailable}
-          terminalAvailable={activeProject !== null && canOperateTerminal}
-          diffAvailable={isServerThread && isGitRepo}
-          filesAvailable={activeProject !== null}
-          pullRequestAvailable={pullRequestSurfaceAvailable}
-          pullRequestsAvailable={pullRequestsSurfaceAvailable}
-          deviceAvailable={activeThreadRef !== null}
-        >
-          {rightPanelContent}
-        </RightPanelTabs>
-      ) : null}
-      {rightPanelPresent && shouldUsePlanSidebarSheet && activeThreadRef ? (
-        <RightPanelSheet
-          animationDurationMs={panelAnimationsActive ? panelAnimationDurationMs : 0}
-          open={rightPanelOpen}
-          onClose={closePreviewPanelStable}
-        >
+      {(rightPanelPresent || rightPanelKeptHidden) &&
+      !shouldUsePlanSidebarSheet &&
+      activeThreadRef ? (
+        <Activity mode={rightPanelPresent ? "visible" : "hidden"}>
           <RightPanelTabs
-            mode="sheet"
+            mode="inline"
             open={rightPanelOpen}
             keybindings={keybindings}
             getShortcutContext={getShortcutContextStable}
+            maximized={rightPanelMaximized}
             inlineSize={previewPanelInlineSize}
-            layoutControls={
-              rightPanelOpen ? (
-                <div className="mr-px flex items-center">{panelToggleControls}</div>
-              ) : null
-            }
-            surfaces={renderedRightPanelSurfaces}
+            surfaces={mountedRightPanelSurfaces}
             environmentId={activeThreadRef.environmentId}
-            activeSurfaceId={renderedRightPanelSurface?.id ?? null}
+            activeSurfaceId={mountedRightPanelSurface?.id ?? null}
             pendingSurfaceIds={pendingFileSurfaceIds}
             previewSessions={activePreviewState.sessions}
             desktopByTabId={activePreviewState.desktopByTabId}
@@ -8662,7 +8623,68 @@ export default function ChatView(props: ChatViewProps) {
           >
             {rightPanelContent}
           </RightPanelTabs>
-        </RightPanelSheet>
+        </Activity>
+      ) : null}
+      {(rightPanelPresent || rightPanelKeptHidden) &&
+      shouldUsePlanSidebarSheet &&
+      activeThreadRef ? (
+        <Activity mode={rightPanelPresent ? "visible" : "hidden"}>
+          <RightPanelSheet
+            animationDurationMs={panelAnimationsActive ? panelAnimationDurationMs : 0}
+            open={rightPanelOpen}
+            onClose={closePreviewPanelStable}
+          >
+            <RightPanelTabs
+              mode="sheet"
+              open={rightPanelOpen}
+              keybindings={keybindings}
+              getShortcutContext={getShortcutContextStable}
+              inlineSize={previewPanelInlineSize}
+              layoutControls={
+                rightPanelOpen ? (
+                  <div className="mr-px flex items-center">{panelToggleControls}</div>
+                ) : null
+              }
+              surfaces={mountedRightPanelSurfaces}
+              environmentId={activeThreadRef.environmentId}
+              activeSurfaceId={mountedRightPanelSurface?.id ?? null}
+              pendingSurfaceIds={pendingFileSurfaceIds}
+              previewSessions={activePreviewState.sessions}
+              desktopByTabId={activePreviewState.desktopByTabId}
+              previewRuntimeTabId={resolvePreviewRuntimeTabId}
+              terminalLabelsById={activeTerminalLabelsById}
+              onActivate={activateRightPanelSurfaceStable}
+              onCloseSurface={closeRightPanelSurfaceStable}
+              onRenameDevice={(surfaceId, title) => {
+                if (activeThreadRef)
+                  useRightPanelStore.getState().renameDevice(activeThreadRef, surfaceId, title);
+              }}
+              onCloseOtherSurfaces={closeOtherRightPanelSurfacesStable}
+              onCloseSurfacesToRight={closeRightPanelSurfacesToRightStable}
+              onCloseAllSurfaces={closeAllRightPanelSurfacesStable}
+              onMoveSurface={moveRightPanelSurfaceStable}
+              onCopyFilePath={copyRightPanelFilePathStable}
+              onAddBrowser={() => createBrowserSurface()}
+              onAddBrowserInProfile={createBrowserSurfaceStable}
+              onAddTerminal={addTerminalSurfaceStable}
+              onAddDiff={addDiffSurfaceStable}
+              onAddFiles={addFilesSurfaceStable}
+              onAddPullRequest={addPullRequestSurfaceStable}
+              onAddPullRequests={addPullRequestsSurfaceStable}
+              onAddImages={addImagesSurfaceStable}
+              onAddDevice={addDeviceSurfaceStable}
+              browserAvailable={canOperatePreview && browserAvailable}
+              terminalAvailable={activeProject !== null && canOperateTerminal}
+              diffAvailable={isServerThread && isGitRepo}
+              filesAvailable={activeProject !== null}
+              pullRequestAvailable={pullRequestSurfaceAvailable}
+              pullRequestsAvailable={pullRequestsSurfaceAvailable}
+              deviceAvailable={activeThreadRef !== null}
+            >
+              {rightPanelContent}
+            </RightPanelTabs>
+          </RightPanelSheet>
+        </Activity>
       ) : null}
 
       <RevertConfirmHost threadKey={routeThreadKey} onConfirm={onConfirmRevertStable} />

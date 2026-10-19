@@ -9,7 +9,7 @@ import type {
   ThreadPullRequestLink,
 } from "@t3tools/contracts";
 import { scopedThreadKey } from "@t3tools/client-runtime/environment";
-import { lazy, Suspense } from "react";
+import { Activity, lazy, Suspense } from "react";
 import type { ComposerImageAttachment, DraftId } from "../../composerDraftStore";
 import type { ShortcutMatchContext } from "../../keybindings";
 import { type RightPanelSurface, useRightPanelStore } from "../../rightPanelStore";
@@ -59,8 +59,7 @@ export interface RightPanelFileProps {
   readonly onPendingChange: (relativePath: string, pending: boolean) => void;
 }
 
-/** The body of the thread's right panel for the surface it is showing. */
-export function RightPanelSurfaceContent(props: {
+interface RightPanelSurfaceContentProps {
   readonly surface: RightPanelSurface | null;
   readonly activeSurfaceId: string | null;
   readonly threadRef: ScopedThreadRef;
@@ -80,7 +79,36 @@ export function RightPanelSurfaceContent(props: {
   readonly pullRequest: RightPanelPullRequestProps;
   readonly files: RightPanelFileProps;
   readonly images: ReadonlyArray<SessionImage>;
-}) {
+  /** Whether the panel holds a diff tab, shown or not. */
+  readonly hasDiffSurface: boolean;
+}
+
+/**
+ * The body of the thread's right panel for the surface it is showing. A diff tab stays mounted
+ * behind the others: remounting it re-highlights every file and starts over at the top.
+ */
+export function RightPanelSurfaceContent(props: RightPanelSurfaceContentProps) {
+  const diffShown = props.surface?.kind === "diff";
+  return (
+    <>
+      {diffShown ? null : <ShownSurfaceContent {...props} />}
+      {props.hasDiffSurface || diffShown ? (
+        <Activity mode={diffShown ? "visible" : "hidden"}>
+          <Suspense fallback={null}>
+            <DiffPanel
+              key={scopedThreadKey(props.threadRef)}
+              mode="embedded"
+              composerDraftTarget={props.composerDraftTarget}
+              workspaceMutationId={props.workspaceMutationId}
+            />
+          </Suspense>
+        </Activity>
+      ) : null}
+    </>
+  );
+}
+
+function ShownSurfaceContent(props: RightPanelSurfaceContentProps) {
   const { surface, threadRef, visible } = props;
   if (surface === null) return null;
   switch (surface.kind) {
@@ -107,16 +135,7 @@ export function RightPanelSurfaceContent(props: {
         />
       );
     case "diff":
-      return (
-        <Suspense fallback={null}>
-          <DiffPanel
-            key={scopedThreadKey(threadRef)}
-            mode="embedded"
-            composerDraftTarget={props.composerDraftTarget}
-            workspaceMutationId={props.workspaceMutationId}
-          />
-        </Suspense>
-      );
+      return null;
     case "pull-request": {
       const pullRequest = props.pullRequest;
       if (!pullRequest.capabilityKnown) return <PullRequestDetailGhost />;

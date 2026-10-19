@@ -50,6 +50,26 @@ export const isNotFoundOnly = (error: unknown): boolean =>
   error.reason.errors.every((graphQlError) => graphQlError["type"] === "NOT_FOUND");
 
 /**
+ * A query answer without the fields GitHub withheld from the credential. A fine-grained token
+ * that lacks one permission gets those fields as `null` next to a FORBIDDEN error; failing the
+ * whole read on it blanked every private repository. Only nested fields are dropped: a refused
+ * root still fails, and so does any mutation, where `null` would read as done.
+ */
+const withoutWithheldFields = (
+  request: GraphQLProtocol.GraphQLRequest,
+  answer: GraphQLProtocol.ExecutionResult,
+): GraphQLProtocol.ExecutionResult => {
+  if (request.kind !== "query" || answer.errors === undefined) return answer;
+  if (typeof answer.data !== "object" || answer.data === null) return answer;
+  const errors = answer.errors.filter(
+    (graphQlError) => graphQlError["type"] !== "FORBIDDEN" || (graphQlError.path?.length ?? 0) < 2,
+  );
+  if (errors.length === answer.errors.length) return answer;
+  const { errors: _withheld, ...rest } = answer;
+  return errors.length === 0 ? rest : { ...rest, errors };
+};
+
+/**
  * GitHub's auth and rate limits around a generated GraphQL call, through `GitHubRequestPolicy`:
  * the same credential, request slots, quota and pause as REST. It fails with the policy's
  * errors, which every GitHub caller already maps. GraphQL `errors` that are not a rate limit are
@@ -81,7 +101,8 @@ export class GitHubGraphQlAuth extends GraphQLMiddleware.Service<
               },
               (headers) =>
                 next({ ...request, headers: Headers.setAll(request.headers, headers) }).pipe(
-                  Effect.map((answer) => {
+                  Effect.map((raw) => {
+                    const answer = withoutWithheldFields(request, raw);
                     const status = answer.status;
                     const responseHeaders = answer.headers ?? Headers.empty;
                     const rateLimited = GitHubRequestPolicy.isRateLimited({
