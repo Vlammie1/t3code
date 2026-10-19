@@ -332,6 +332,17 @@ Follow an agent's file link to read a report or other file outside the workspace
 These files open read-only. An HTML file outside the workspace cannot load scripts,
 styles, or images from neighboring files.
 
+## Markdown files in the file viewer
+
+On web and desktop, Markdown files open as a formatted document. Click a paragraph to edit
+its Markdown in place; the change saves when you click away or press Escape. Switch to source
+view for the whole file.
+
+Select text and choose **Comment** to leave a comment beside it. Start a comment or reply with
+`@Claude` to send it to the chat's agent, which answers in the same comment. Comments are stored
+in the file itself, in a hidden block at the end, so any agent that reads the file sees them.
+Resolving a comment removes it from the file.
+
 ## HTML and PDF files in the file viewer
 
 On web and desktop, HTML and PDF files open as rendered pages. Switch an HTML

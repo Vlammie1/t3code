@@ -2437,3 +2437,81 @@ body {
     transparent
   ) !important;
 }
+
+/* Markdown files open as a document. Each block is its own markdown root, so
+   the spacing comes from the blocks' margins, which collapse across wrappers. */
+.markdown-document {
+  --markdown-document-serif: ui-serif, "Iowan Old Style", Charter, "Source Serif 4", Georgia, serif;
+}
+
+.markdown-document .chat-markdown {
+  font-size: 1rem;
+  line-height: 1.7;
+  color: var(--foreground);
+}
+
+.markdown-document .chat-markdown > * {
+  margin-top: 0.9rem;
+  margin-bottom: 0.9rem;
+}
+
+.markdown-document .chat-markdown > :is(h1, h2, h3, h4, h5, h6) {
+  margin-top: 2.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.markdown-document > :first-child .chat-markdown > :first-child {
+  margin-top: 0;
+}
+
+.markdown-document :is(h1, h2, h3) {
+  font-family: var(--markdown-document-serif);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--contrast-foreground);
+}
+
+.markdown-document h1 {
+  font-size: 2.25rem;
+  line-height: 1.15;
+}
+
+.markdown-document h2 {
+  font-size: 1.625rem;
+  line-height: 1.25;
+}
+
+.markdown-document h3 {
+  font-size: 1.25rem;
+  line-height: 1.35;
+}
+
+.markdown-document h4 {
+  font-size: 1rem;
+}
+
+.markdown-document li + li {
+  margin-top: 0.3rem;
+}
+
+/* Editable blocks show where a click lands without moving any text. */
+.markdown-document[data-editable] [data-markdown-block] {
+  cursor: text;
+  border-radius: 0.75rem;
+  transition:
+    background-color 150ms ease-out,
+    box-shadow 150ms ease-out;
+}
+
+.markdown-document[data-editable] [data-markdown-block]:hover {
+  background-color: color-mix(in srgb, var(--foreground) 3%, transparent);
+  box-shadow: 0 0 0 0.5rem color-mix(in srgb, var(--foreground) 3%, transparent);
+}
+
+::highlight(t3-markdown-comment) {
+  background-color: color-mix(in oklab, var(--warning) 22%, transparent);
+}
+
+::highlight(t3-markdown-comment-active) {
+  background-color: color-mix(in oklab, var(--warning) 45%, transparent);
+}

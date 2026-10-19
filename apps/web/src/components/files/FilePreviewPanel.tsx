@@ -69,6 +69,11 @@ import { previewEnvironment } from "~/state/preview";
 import { useEnvironmentScope } from "~/state/session";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { useAtomQueryRunner } from "~/state/use-atom-query-runner";
+import { projectEnvironment } from "~/state/projects";
+import {
+  WORKSPACE_BASENAME_LOOKUP_LIMIT,
+  pickWorkspaceSuffixMatch,
+} from "~/workspaceBasenameLookup";
 
 import { AttachmentFilePreview } from "./AttachmentFilePreview";
 import { AudioPreview } from "./AudioPreview";
@@ -77,7 +82,7 @@ import { DelimitedTablePreview } from "./DelimitedTablePreview";
 import FileBrowserPanel from "./FileBrowserPanel";
 import { FileBreadcrumbs } from "./FileBreadcrumbs";
 import { breadcrumbPathOf, retainedBreadcrumbTrail, trailChildOf } from "./filePath";
-import { FileMarkdownPreview } from "./FileMarkdownPreview";
+import { MarkdownDocumentSurface } from "./MarkdownDocumentSurface";
 import {
   type FileCommentAnnotationEntry,
   type FileCommentAnnotationGroup,
@@ -104,13 +109,11 @@ import {
   filePreviewReadErrorMessage,
   isMarkdownPreviewFile,
   resolveFilePreviewPath,
-  setMarkdownTaskChecked,
   shouldShowFileExplorer,
   workspaceAssetResource,
 } from "./filePreviewMode";
 import { useFileSaveCoordinator } from "./useFileSaveCoordinator";
 import {
-  getOptimisticProjectFileQueryData,
   getProjectFileContents,
   setProjectFileQueryData,
   useProjectFileQuery,
@@ -139,7 +142,6 @@ interface FilePreviewPanelProps {
 }
 
 const FILE_EXPLORER_STORAGE_KEY = "t3code.fileExplorerOpen";
-const RENDER_MARKDOWN_STORAGE_KEY = "t3code.renderMarkdown";
 const RENDER_BROWSER_FILE_STORAGE_KEY = "t3code.renderBrowserFile";
 const RENDER_TABLE_STORAGE_KEY = "t3code.renderTable";
 type FilePostRender = <LAnnotation>(
@@ -896,58 +898,6 @@ function EditableFileSurface({
   );
 }
 
-function RenderedMarkdownSurface({
-  environmentId,
-  cwd,
-  relativePath,
-  contents,
-  threadRef,
-  readOnly,
-  onPendingChange,
-}: Omit<
-  EditableFileSurfaceProps,
-  | "resolvedTheme"
-  | "composerDraftTarget"
-  | "revealLine"
-  | "revealRequestId"
-  | "wordWrap"
-  | "onPostRender"
-> & {
-  threadRef: ScopedThreadRef;
-  readOnly: boolean;
-}) {
-  const saveCoordinator = useFileSaveCoordinator({
-    environmentId,
-    cwd,
-    relativePath,
-    onPendingChange,
-  });
-
-  return (
-    <ScrollArea className="min-h-0 flex-1">
-      <FileMarkdownPreview
-        text={contents}
-        cwd={cwd}
-        relativePath={relativePath}
-        threadRef={threadRef}
-        onTaskListChange={
-          readOnly
-            ? undefined
-            : ({ markerOffset, checked }) => {
-                const currentContents =
-                  getOptimisticProjectFileQueryData(environmentId, cwd, relativePath)?.contents ??
-                  contents;
-                const nextContents = setMarkdownTaskChecked(currentContents, markerOffset, checked);
-                if (nextContents === currentContents) return;
-                setProjectFileQueryData(environmentId, cwd, relativePath, nextContents);
-                saveCoordinator.change(nextContents);
-              }
-        }
-      />
-    </ScrollArea>
-  );
-}
-
 function renderedToggleLabel(mode: "markdown" | "html" | "table", rendered: boolean): string {
   if (mode === "markdown") return rendered ? "Show markdown source" : "Show rendered markdown";
   if (mode === "table") return rendered ? "Show source" : "Show table";
@@ -1016,6 +966,40 @@ export default function FilePreviewPanel({
     attachment === undefined && relativePath !== null,
   );
   const attemptedPath = file.readError?.resolvedPath ?? file.readError?.operationPath;
+  const searchProjectEntries = useAtomQueryRunner(projectEnvironment.searchEntries, {
+    reportFailure: false,
+  });
+  const missingWorkspacePath =
+    attachment === undefined &&
+    relativePath !== null &&
+    !isHostFile &&
+    file.readError?.failure === "operation_failed" &&
+    file.readError.operation === "realpath-target"
+      ? relativePath
+      : null;
+  // A missing relative path is often relative to the subfolder the agent worked
+  // in; when exactly one file ends in it, this tab moves to that file.
+  useEffect(() => {
+    if (missingWorkspacePath === null) return;
+    let current = true;
+    void searchProjectEntries({
+      environmentId,
+      input: {
+        cwd,
+        query: missingWorkspacePath,
+        limit: WORKSPACE_BASENAME_LOOKUP_LIMIT,
+        kind: "file",
+      },
+    }).then((result) => {
+      if (!current || result._tag !== "Success") return;
+      const match = pickWorkspaceSuffixMatch(missingWorkspacePath, result.value.entries);
+      if (match !== null) onNavigateFolder(match, match, false);
+    });
+    return () => {
+      current = false;
+    };
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- One lookup per missing path; the runner and callback are not inputs.
+  }, [cwd, environmentId, missingWorkspacePath]);
   // A chat link cannot tell a folder from a file, so a folder arrives here as
   // a file surface and the read fails. Keep the breadcrumbs, drop the preview
   // pane, and let the tree fill the surface with the folder revealed. Mutation
@@ -1043,11 +1027,8 @@ export default function FilePreviewPanel({
     explorerOpen,
     attachmentOpen: attachment !== undefined,
   });
-  const [renderMarkdownPreferred, setRenderMarkdownPreferred] = useLocalStorage(
-    RENDER_MARKDOWN_STORAGE_KEY,
-    false,
-    Schema.Boolean,
-  );
+  // A markdown file always opens as a document; the source view is a per-file detour.
+  const [markdownSourcePath, setMarkdownSourcePath] = useState<string | null>(null);
   const [renderBrowserFilePreferred, setRenderBrowserFilePreferred] = useLocalStorage(
     RENDER_BROWSER_FILE_STORAGE_KEY,
     true,
@@ -1071,7 +1052,7 @@ export default function FilePreviewPanel({
   const revealHandled =
     revealLine === null ||
     (handledReveal?.path === relativePath && handledReveal.requestId === revealRequestId);
-  const renderMarkdown = isMarkdown && renderMarkdownPreferred && revealHandled;
+  const renderMarkdown = isMarkdown && markdownSourcePath !== relativePath && revealHandled;
   const renderBrowserFile = isPdf || (isHtml && renderBrowserFilePreferred && revealHandled);
   const renderTable = tableDelimiter !== null && renderTablePreferred && revealHandled;
   const renderedMode = isMarkdown
@@ -1091,7 +1072,7 @@ export default function FilePreviewPanel({
     !renderBrowserFile;
   const rendered = isMarkdown ? renderMarkdown : tableDelimiter ? renderTable : renderBrowserFile;
   const setRenderedPreferred = isMarkdown
-    ? setRenderMarkdownPreferred
+    ? (pressed: boolean) => setMarkdownSourcePath(pressed ? null : relativePath)
     : tableDelimiter
       ? setRenderTablePreferred
       : setRenderBrowserFilePreferred;
@@ -1381,14 +1362,15 @@ export default function FilePreviewPanel({
             </div>
           ) : relativePath && file.data ? (
             isMarkdown && renderMarkdown ? (
-              <RenderedMarkdownSurface
+              <MarkdownDocumentSurface
                 key={relativePath}
                 environmentId={environmentId}
                 cwd={cwd}
                 relativePath={relativePath}
                 threadRef={threadRef}
+                draft={draft}
                 contents={file.data.contents}
-                readOnly={isHostFile || !canWriteFiles}
+                readOnly={isHostFile || !canWriteFiles || file.data.truncated}
                 onPendingChange={onPendingChange}
               />
             ) : tableDelimiter && renderTable ? (

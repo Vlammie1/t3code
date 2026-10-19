@@ -4,6 +4,7 @@ import {
   claimWorkspaceBasenameLookup,
   needsWorkspaceBasenameLookup,
   pickWorkspaceBasenameMatch,
+  pickWorkspaceSuffixMatch,
 } from "./workspaceBasenameLookup";
 
 describe("needsWorkspaceBasenameLookup", () => {
@@ -88,5 +89,33 @@ describe("claimWorkspaceBasenameLookup", () => {
   it("stays valid while it is the only claim", () => {
     const only = claimWorkspaceBasenameLookup();
     expect(only()).toBe(true);
+  });
+});
+
+describe("pickWorkspaceSuffixMatch", () => {
+  const entries = [
+    { path: "kwartje/docs/e-boekhouden-analyse.md", kind: "file" as const },
+    { path: "kwartje/README.md", kind: "file" as const },
+    { path: "kwartje/docs", kind: "directory" as const },
+  ];
+
+  it("finds the one file a subfolder-relative link meant", () => {
+    expect(pickWorkspaceSuffixMatch("docs/e-boekhouden-analyse.md", entries)).toBe(
+      "kwartje/docs/e-boekhouden-analyse.md",
+    );
+    expect(pickWorkspaceSuffixMatch("./docs\\E-Boekhouden-Analyse.md", entries)).toBe(
+      "kwartje/docs/e-boekhouden-analyse.md",
+    );
+  });
+
+  it("leaves the link alone when it is ambiguous or not a path", () => {
+    const twice = [
+      ...entries,
+      { path: "other/docs/e-boekhouden-analyse.md", kind: "file" as const },
+    ];
+    expect(pickWorkspaceSuffixMatch("docs/e-boekhouden-analyse.md", twice)).toBeNull();
+    expect(pickWorkspaceSuffixMatch("README.md", entries)).toBeNull();
+    expect(pickWorkspaceSuffixMatch("../docs/e-boekhouden-analyse.md", entries)).toBeNull();
+    expect(pickWorkspaceSuffixMatch("oc/README.md", entries)).toBeNull();
   });
 });

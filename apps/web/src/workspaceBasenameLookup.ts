@@ -46,3 +46,23 @@ export function pickWorkspaceBasenameMatch(
   );
   return foldedMatches.length === 1 ? (foldedMatches[0]?.path ?? null) : null;
 }
+
+/**
+ * An agent that worked in a subfolder links paths relative to that folder, so
+ * `docs/plan.md` can mean `app/docs/plan.md`. Only a single file ending in the
+ * whole requested path counts; two candidates leave the link as it was.
+ */
+export function pickWorkspaceSuffixMatch(
+  relativePath: string,
+  entries: ReadonlyArray<WorkspaceEntryCandidate>,
+): string | null {
+  const target = relativePath.trim().replaceAll("\\", "/").replace(/^\.\//, "");
+  if (!target.includes("/") || target.startsWith("../")) return null;
+  const files = entries.filter((entry) => entry.kind === "file");
+  const matchesOf = (fold: (value: string) => string) =>
+    files.filter((entry) => fold(entry.path).endsWith(`/${fold(target)}`));
+  const exact = matchesOf((value) => value);
+  if (exact.length > 0) return exact.length === 1 ? (exact[0]?.path ?? null) : null;
+  const folded = matchesOf((value) => value.toLowerCase());
+  return folded.length === 1 ? (folded[0]?.path ?? null) : null;
+}
