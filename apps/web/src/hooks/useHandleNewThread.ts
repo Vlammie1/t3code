@@ -26,6 +26,7 @@ import {
   readProjects,
   readThreadShell,
   readThreadShells,
+  useLastUsedProjectKey,
   useProjects,
   useQuietThreadShell,
 } from "../state/entities";
@@ -398,8 +399,13 @@ export function useHandleNewThread() {
       : null,
   );
   const projects = useProjects();
+  const lastUsedProjectKey = useLastUsedProjectKey();
   const handleNewThread = useNewThreadHandler();
-  const [defaultProject] = orderItemsByPreferredIds({
+  const lastUsedProject =
+    lastUsedProjectKey === null
+      ? undefined
+      : projects.find((project) => `${project.environmentId}:${project.id}` === lastUsedProjectKey);
+  const [firstProject] = orderItemsByPreferredIds({
     items: projects,
     preferredIds: projectOrder,
     getId: getProjectOrderKey,
@@ -408,6 +414,7 @@ export function useHandleNewThread() {
       legacyProjectCwdPreferenceKey(project.workspaceRoot),
     ],
   });
+  const defaultProject = lastUsedProject ?? firstProject;
   const defaultProjectRef = defaultProject
     ? scopeProjectRef(defaultProject.environmentId, defaultProject.id)
     : null;

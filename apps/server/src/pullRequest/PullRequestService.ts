@@ -346,6 +346,27 @@ function parseListCursor(raw: string): ListCursor | null {
   };
 }
 
+/**
+ * A fork's identity is its `upstream` parent, which keeps forks grouped with
+ * the original. Its pull requests are the fork's own, though: listing the
+ * parent would bury them under every upstream pull request.
+ */
+export function forkListingIdentity(
+  identity: OrchestrationProjectShell["repositoryIdentity"],
+): OrchestrationProjectShell["repositoryIdentity"] {
+  const origin = identity?.origin;
+  if (!identity || !origin || identity.provider === "azure-devops") return identity;
+  const path = origin.displayName ?? origin.canonicalKey.split("/").slice(1).join("/");
+  const segments = path.split("/").filter((segment) => segment.length > 0);
+  const { owner: _owner, name: _name, origin: _origin, ...rest } = identity;
+  return {
+    ...rest,
+    canonicalKey: origin.canonicalKey,
+    displayName: path,
+    ...(segments.length >= 2 ? { owner: segments[0]!, name: segments.at(-1)! } : {}),
+  };
+}
+
 function listCursorKey(host: string, repository: string): string {
   return `${host} ${repository.toLowerCase()}`;
 }
@@ -709,9 +730,9 @@ export const make = Effect.gen(function* () {
         for (const project of projects) {
           if (filter.projectId !== undefined && project.id !== filter.projectId) continue;
           if (filter.projectIds !== undefined && !filter.projectIds.includes(project.id)) continue;
-          const identity = project.repositoryIdentity;
+          const identity = forkListingIdentity(project.repositoryIdentity);
           let kind = identity?.provider as SourceControlProviderKind | undefined;
-          const repository = sourceControlRepositorySelector(project.repositoryIdentity);
+          const repository = sourceControlRepositorySelector(identity);
           if (!identity || kind === undefined || repository === null) continue;
           let refinedProvider: SourceControlProviderInfo | null | undefined;
           if (

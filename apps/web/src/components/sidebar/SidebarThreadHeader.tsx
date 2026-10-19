@@ -20,7 +20,6 @@ export interface SidebarThreadHeaderProps {
   onNewThread: (event: ReactMouseEvent) => void;
   newThreadDisabled: boolean;
   newThreadShortcutLabel: string | null | undefined;
-  newThreadInProjectShortcutLabel: string | null | undefined;
   showNewThreadInProjectHint: boolean;
   searchInputRef: RefObject<HTMLInputElement | null>;
   searchQuery: string;
@@ -40,7 +39,6 @@ export function SidebarThreadHeader({
   onNewThread,
   newThreadDisabled,
   newThreadShortcutLabel,
-  newThreadInProjectShortcutLabel,
   showNewThreadInProjectHint,
   searchInputRef,
   searchQuery,
@@ -118,10 +116,7 @@ export function SidebarThreadHeader({
             showNewThreadInProjectHint ? (
               <span className="flex flex-col gap-0.5">
                 <span>{newThreadLabel}</span>
-                <span className="text-muted-foreground">
-                  New thread in current project: Shift+click
-                  {newThreadInProjectShortcutLabel ? ` (${newThreadInProjectShortcutLabel})` : ""}
-                </span>
+                <span className="text-muted-foreground">Pick a project: Shift+click</span>
               </span>
             ) : (
               newThreadLabel

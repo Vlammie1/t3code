@@ -1,4 +1,8 @@
-import { presentThreadShell } from "@t3tools/client-runtime/state/models";
+import {
+  presentThreadShell,
+  type ThreadRunSummary,
+  type ThreadRuntimeSummary,
+} from "@t3tools/client-runtime/state/models";
 import * as DateTime from "effect/DateTime";
 import { deriveActiveWorkStartedAt } from "../session-logic.ts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
@@ -6,9 +10,9 @@ import { defaultAnimateLayoutChanges, type AnimateLayoutChanges } from "@dnd-kit
 import * as Cause from "effect/Cause";
 import { AsyncResult } from "effect/reactivity";
 import {
-  EMPTY_SIDEBAR_THREAD_FILTER,
-  matchesSidebarThreadFilter,
-  sortThreadsByStatusGroup,
+  SIDEBAR_STATUS_GROUPS,
+  resolveSidebarStatusGroup,
+  sortThreadsByGroupRank,
   animateSidebarLayoutChanges,
   archiveSelectedThreadEntries,
   buildBulkTitleRegenerationContextMenuItem,
@@ -994,7 +998,7 @@ describe("resolveSidebarThreadStatus", () => {
   });
 });
 
-describe("sortThreadsByStatusGroup", () => {
+describe("resolveSidebarStatusGroup", () => {
   const running = {
     status: "running" as const,
     activeRunId: null,
@@ -1003,39 +1007,57 @@ describe("sortThreadsByStatusGroup", () => {
     lastError: null,
     updatedAt: "2026-03-09T10:00:00.000Z",
   };
-  const base = { hasPendingApprovals: false, hasPendingUserInput: false, runtime: null };
+  const completedRun = (
+    completedAt: string,
+    status: "completed" | "failed" = "completed",
+  ): ThreadRunSummary => ({
+    runId: RunId.make("run-1"),
+    status,
+    requestedAt: null,
+    startedAt: null,
+    completedAt,
+    assistantMessageId: null,
+  });
+  const base = {
+    hasPendingApprovals: false,
+    hasPendingUserInput: false,
+    runtime: null as ThreadRuntimeSummary | null,
+    latestRun: null as ThreadRunSummary | null,
+    lastVisitedAt: undefined as string | undefined,
+    interactionMode: "default" as const,
+    hasActionableProposedPlan: false,
+  };
   const finishedA = { ...base, id: "finished-a" };
   const asking = { ...base, id: "asking", hasPendingUserInput: true };
   const working = { ...base, id: "working", runtime: running };
-  const finishedB = { ...base, id: "finished-b" };
+  const unread = {
+    ...base,
+    id: "unread",
+    latestRun: completedRun("2026-03-09T11:00:00.000Z"),
+    lastVisitedAt: "2026-03-09T10:00:00.000Z",
+  };
+  const read = { ...unread, id: "read", lastVisitedAt: "2026-03-09T12:00:00.000Z" };
 
-  it("puts running threads first, then the ones needing the user, then finished ones", () => {
+  it("sorts running threads first, then the ones needing the user, then finished ones", () => {
+    const rank = (thread: typeof finishedA) =>
+      SIDEBAR_STATUS_GROUPS.indexOf(resolveSidebarStatusGroup(thread));
     expect(
-      sortThreadsByStatusGroup([finishedA, asking, working, finishedB]).map((thread) => thread.id),
-    ).toEqual(["working", "asking", "finished-a", "finished-b"]);
+      sortThreadsByGroupRank([finishedA, asking, working, unread, read], rank).map(
+        (thread) => thread.id,
+      ),
+    ).toEqual(["working", "asking", "unread", "finished-a", "read"]);
   });
 
-  it("filters by status group and leaves everything visible without a filter", () => {
-    const threads = [finishedA, asking, working];
-    const latestRun = null;
-    const withRun = threads.map((thread) => ({
-      ...thread,
-      latestRun,
-      interactionMode: "default" as const,
-      hasActionableProposedPlan: false,
-    }));
+  it("counts an unseen failure as needing the user until it is opened", () => {
+    const failed = {
+      ...base,
+      latestRun: completedRun("2026-03-09T11:00:00.000Z", "failed"),
+      lastVisitedAt: "2026-03-09T10:00:00.000Z",
+    };
+    expect(resolveSidebarStatusGroup(failed)).toBe("attention");
     expect(
-      withRun
-        .filter((thread) => matchesSidebarThreadFilter(thread, EMPTY_SIDEBAR_THREAD_FILTER))
-        .map((thread) => thread.id),
-    ).toEqual(["finished-a", "asking", "working"]);
-    expect(
-      withRun
-        .filter((thread) =>
-          matchesSidebarThreadFilter(thread, { groups: ["attention"], unreadOnly: false }),
-        )
-        .map((thread) => thread.id),
-    ).toEqual(["asking"]);
+      resolveSidebarStatusGroup({ ...failed, lastVisitedAt: "2026-03-09T12:00:00.000Z" }),
+    ).toBe("finished");
   });
 });
 

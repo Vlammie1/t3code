@@ -89,6 +89,7 @@ import {
   TerminalIcon,
   Undo2Icon,
   XIcon,
+  type LucideIcon,
 } from "lucide-react";
 import {
   memo,
@@ -213,11 +214,12 @@ import {
   type SidebarDropVerb,
   resolveSidebarThreadStatus,
   resolveThreadLastVisitedAt,
-  EMPTY_SIDEBAR_THREAD_FILTER,
-  isSidebarThreadFilterActive,
-  matchesSidebarThreadFilter,
-  sortThreadsByStatusGroup,
-  type SidebarThreadFilter,
+  DEFAULT_SIDEBAR_THREAD_VIEW,
+  SIDEBAR_STATUS_GROUPS,
+  resolveSidebarStatusGroup,
+  sortThreadsByGroupRank,
+  type SidebarStatusGroup,
+  type SidebarThreadView,
   searchSidebarThreads,
   shouldCreateNewThreadInCurrentProject,
   shouldNavigateAfterThreadPark,
@@ -284,7 +286,7 @@ import {
 import { SidebarContent, SidebarGroup, useSidebar } from "./ui/sidebar";
 import { SidebarChromeFooter, SidebarChromeHeader } from "./sidebar/SidebarChrome";
 import { SidebarHeaderIconButton, SidebarThreadHeader } from "./sidebar/SidebarThreadHeader";
-import { SidebarThreadFilterSection } from "./sidebar/SidebarThreadFilterSection";
+import { SidebarThreadViewSection } from "./sidebar/SidebarThreadViewSection";
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuShortcut, MenuTrigger } from "./ui/menu";
 import { Tooltip, TooltipPopup, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import { MiddleTruncate } from "./ui/middle-truncate";
@@ -372,11 +374,60 @@ const SETTLED_TAIL_PAGE_COUNT = 25;
 const SETTLED_SHELF_EXPANDED_KEY = "t3code:sidebar:settled-expanded";
 const SNOOZED_SHELF_EXPANDED_KEY = "t3code:sidebar:snoozed-expanded";
 const WORKING_SHELF_EXPANDED_KEY = "t3code:sidebar:working-expanded";
-const THREAD_FILTER_KEY = "t3code:sidebar:thread-filter";
-const SidebarThreadFilterSchema = Schema.Struct({
-  groups: Schema.Array(Schema.Literals(["active", "attention", "finished"])),
-  unreadOnly: Schema.Boolean,
-});
+const THREAD_VIEW_KEY = "t3code:sidebar:thread-view";
+const COLLAPSED_GROUPS_KEY = "t3code:sidebar:collapsed-groups";
+const CollapsedGroupsSchema = Schema.Array(Schema.String);
+const NO_COLLAPSED_GROUPS: readonly string[] = [];
+const SidebarThreadViewSchema = Schema.Literals(["status", "project", "recent"]);
+const NO_PROJECT_RANK = Number.MAX_SAFE_INTEGER;
+
+const STATUS_GROUP_LABEL: Record<SidebarStatusGroup, string> = {
+  active: "Active",
+  attention: "Needs your input",
+  finished: "Finished",
+};
+
+interface SidebarActiveViewContext {
+  readonly view: SidebarThreadView;
+  readonly localLastVisitedAtByKey: Readonly<Record<string, string>>;
+  readonly projectGroupKeyByProjectKey: ReadonlyMap<string, string>;
+  readonly projectRankByGroupKey: ReadonlyMap<string, number>;
+}
+
+/** The status or project group an inbox row sits under; null in the newest-first view. */
+function activeGroupKeyOf(
+  thread: EnvironmentThreadShell,
+  context: SidebarActiveViewContext,
+): string | null {
+  if (context.view === "recent") return null;
+  if (context.view === "project") {
+    return (
+      context.projectGroupKeyByProjectKey.get(`${thread.environmentId}:${thread.projectId}`) ??
+      `${thread.environmentId}:${thread.projectId}`
+    );
+  }
+  return resolveSidebarStatusGroup({
+    ...thread,
+    lastVisitedAt: resolveThreadLastVisitedAt(
+      thread.lastVisitedAt,
+      context.localLastVisitedAtByKey[threadShellKey(thread)],
+    ),
+  });
+}
+
+// Groups keep the inbox's own order inside them.
+function sortActiveThreadsForView(
+  threads: readonly EnvironmentThreadShell[],
+  context: SidebarActiveViewContext,
+): EnvironmentThreadShell[] {
+  if (context.view === "recent") return [...threads];
+  return sortThreadsByGroupRank(threads, (thread) => {
+    const key = activeGroupKeyOf(thread, context);
+    return context.view === "status"
+      ? SIDEBAR_STATUS_GROUPS.indexOf(key as SidebarStatusGroup)
+      : (context.projectRankByGroupKey.get(key ?? "") ?? NO_PROJECT_RANK);
+  });
+}
 
 const inboxReturns = createInboxReturnTracker();
 
@@ -397,8 +448,7 @@ interface SidebarThreadPartitionInput {
   readonly serverConfigs: ReadonlyMap<EnvironmentId, EnvironmentServerConfig>;
   readonly optimisticDrop: SidebarOptimisticDrop | null;
   readonly workingShelfEnabled: boolean;
-  readonly threadFilter: SidebarThreadFilter;
-  readonly localLastVisitedAtByKey: Readonly<Record<string, string>>;
+  readonly viewContext: SidebarActiveViewContext;
   // Snooze wakes and the queued-turn grace depend on the clock, so the minute
   // tick and the precise snooze-wake tick are inputs: a new key repartitions.
   readonly clockKey: string;
@@ -422,8 +472,10 @@ function resolveDraggedOrders(input: {
   readonly settledThreads: readonly EnvironmentThreadShell[];
   readonly activeThreads: readonly EnvironmentThreadShell[];
   readonly workingShelfEnabled: boolean;
+  readonly viewContext: SidebarActiveViewContext;
 }): typeof NO_DRAGGED_ORDERS {
-  const { drag, threadByKey, settledThreads, activeThreads, workingShelfEnabled } = input;
+  const { drag, threadByKey, settledThreads, activeThreads, workingShelfEnabled, viewContext } =
+    input;
   const thread = threadByKey.get(drag.activeKey);
   if (thread === undefined) return NO_DRAGGED_ORDERS;
   const others = (list: readonly EnvironmentThreadShell[]) =>
@@ -434,11 +486,12 @@ function resolveDraggedOrders(input: {
       applySidebarThreadDrop(thread, "settled", drag.occurredAt),
     ]).map(threadShellKey),
     activeOrder: workingShelfEnabled
-      ? sortThreadsByStatusGroup(
+      ? sortActiveThreadsForView(
           sortInboxThreadsByReturn(
             [...others(activeThreads), applySidebarThreadDrop(thread, "active", drag.occurredAt)],
             inboxReturns.returnedAt,
           ),
+          viewContext,
         ).map(threadShellKey)
       : undefined,
   };
@@ -463,7 +516,9 @@ function useSidebarThreads(input: {
   readonly serverConfigs: ReadonlyMap<EnvironmentId, EnvironmentServerConfig>;
   readonly optimisticDrop: SidebarOptimisticDrop | null;
   readonly routeThreadKey: string | null;
-  readonly threadFilter: SidebarThreadFilter;
+  readonly threadView: SidebarThreadView;
+  readonly projectGroupKeyByProjectKey: ReadonlyMap<string, string>;
+  readonly projectRankByGroupKey: ReadonlyMap<string, number>;
 }) {
   const {
     projectScopeKey,
@@ -471,11 +526,19 @@ function useSidebarThreads(input: {
     serverConfigs,
     optimisticDrop,
     routeThreadKey,
-    threadFilter,
+    threadView,
+    projectGroupKeyByProjectKey,
+    projectRankByGroupKey,
   } = input;
   const threads = useThreadShells();
   const workingShelfEnabled = useClientSettings((s) => s.sidebarWorkingShelfEnabled);
   const localLastVisitedAtByKey = useUiStateStore((state) => state.threadLastVisitedAtById);
+  const viewContext: SidebarActiveViewContext = {
+    view: threadView,
+    localLastVisitedAtByKey,
+    projectGroupKeyByProjectKey,
+    projectRankByGroupKey,
+  };
   const nowMinute = useNowMinute();
   // Snooze wake times are second-precise, so classifying with the quantized
   // minute would hold a woken thread on the shelf for up to a minute.
@@ -517,8 +580,7 @@ function useSidebarThreads(input: {
     serverConfigs,
     optimisticDrop,
     workingShelfEnabled,
-    threadFilter,
-    localLastVisitedAtByKey,
+    viewContext,
     clockKey: `${nowMinute}:${snoozeWakeTick}`,
   });
   const partitionNextWakeAt = partition.snoozedThreads[0]?.snoozedUntil ?? null;
@@ -567,6 +629,7 @@ function useSidebarThreads(input: {
     ...partition,
     threads,
     workingShelfEnabled,
+    viewContext,
     searchableThreads: [
       ...pinnedThreads,
       ...activeThreads,
@@ -613,25 +676,10 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
     serverConfigs,
     optimisticDrop,
     workingShelfEnabled,
-    threadFilter,
-    localLastVisitedAtByKey,
+    viewContext,
   } = input;
   const preciseNow = new Date().toISOString();
-  const scoped = filterSidebarV2VisibleThreads(threads, scopedProjectKeys);
-  const visible = isSidebarThreadFilterActive(threadFilter)
-    ? scoped.filter((thread) =>
-        matchesSidebarThreadFilter(
-          {
-            ...thread,
-            lastVisitedAt: resolveThreadLastVisitedAt(
-              thread.lastVisitedAt,
-              localLastVisitedAtByKey[threadShellKey(thread)],
-            ),
-          },
-          threadFilter,
-        ),
-      )
-    : scoped;
+  const visible = filterSidebarV2VisibleThreads(threads, scopedProjectKeys);
   inboxReturns.observe(workingShelfEnabled ? threads : null);
   const pinned: EnvironmentThreadShell[] = [];
   const active: EnvironmentThreadShell[] = [];
@@ -688,12 +736,11 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
   // sort, or mixed-version fleets would render different pinned orders on
   // web and mobile from the same data.
   const sortedPinned = sortPinnedThreadsForSidebar(pinned);
-  // Running threads first, then the ones waiting on the user, then finished
-  // ones; each group keeps the inbox's own order.
-  const sortedActive = sortThreadsByStatusGroup(
+  const sortedActive = sortActiveThreadsForView(
     workingShelfEnabled
       ? sortInboxThreadsByReturn(active, inboxReturns.returnedAt)
       : sortThreadsForSidebar(active),
+    viewContext,
   );
   return {
     pinnedThreads:
@@ -821,6 +868,16 @@ function useSidebarLookups() {
   const projectGroupByScopeKey = new Map(
     projectGroups.map((project) => [project.projectKey, project] as const),
   );
+  const projectGroupKeyByProjectKey = new Map(
+    projectGroups.flatMap((group) =>
+      group.memberProjects.map(
+        (project) => [`${project.environmentId}:${project.id}`, group.projectKey] as const,
+      ),
+    ),
+  );
+  const projectRankByGroupKey = new Map(
+    projectGroups.map((group, index) => [group.projectKey, index] as const),
+  );
   const projectScopeItems = [
     { value: "all", label: "All projects" },
     ...projectGroups.map((project) => ({ value: project.projectKey, label: project.displayName })),
@@ -834,6 +891,8 @@ function useSidebarLookups() {
     projectByKey,
     projectDisplayNameByKey,
     projectGroupByScopeKey,
+    projectGroupKeyByProjectKey,
+    projectRankByGroupKey,
     projectScopeItems,
   };
 }
@@ -1340,6 +1399,50 @@ function SidebarSectionHeader(props: {
         {props.label}
       </CollapsibleSectionHeader>
     </SortableSidebarMarker>
+  );
+}
+
+const STATUS_GROUP_ICON: Record<
+  SidebarStatusGroup,
+  { readonly Icon: LucideIcon; readonly className: string }
+> = {
+  active: { Icon: CircleDashedIcon, className: "text-info" },
+  attention: { Icon: MessageCircleQuestionIcon, className: "text-warning" },
+  finished: { Icon: CircleCheckIcon, className: "text-success" },
+};
+
+// Not sortable: rows drag across it, and the inbox re-sorts into groups on drop.
+function SidebarActiveGroupHeader(props: {
+  label: string;
+  count: number;
+  status: SidebarStatusGroup | null;
+  project: ProjectFaviconProject | null;
+  first: boolean;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const statusIcon = props.status === null ? null : STATUS_GROUP_ICON[props.status];
+  return (
+    <li data-thread-selection-safe className={cn("mx-0.5 list-none", !props.first && "mt-1")}>
+      <CollapsibleSectionHeader
+        expanded={props.expanded}
+        onClick={props.onToggle}
+        tone="emphasized"
+        accessory={
+          <span className="shrink-0 tabular-nums text-sidebar-muted-foreground/70">
+            {props.count}
+          </span>
+        }
+      >
+        <span className="flex min-w-0 items-center gap-1.5">
+          {statusIcon ? (
+            <statusIcon.Icon aria-hidden className={cn("size-3.5", statusIcon.className)} />
+          ) : null}
+          {props.project ? <ProjectFavicon project={props.project} className="size-3.5" /> : null}
+          <span className="truncate">{props.label}</span>
+        </span>
+      </CollapsibleSectionHeader>
+    </li>
   );
 }
 
@@ -2748,6 +2851,8 @@ export default function Sidebar() {
     projectByKey,
     projectDisplayNameByKey,
     projectGroupByScopeKey,
+    projectGroupKeyByProjectKey,
+    projectRankByGroupKey,
     projectScopeItems,
   } = useSidebarLookups();
   const router = useRouter();
@@ -2845,11 +2950,23 @@ export default function Sidebar() {
   const projectGroupsRef = useRef(projectGroups);
   const persistedProjectScopeKey = useUiStateStore((store) => store.sidebarProjectScopeKey);
   const setPersistedProjectScopeKey = useUiStateStore((store) => store.setSidebarProjectScopeKey);
-  const [threadFilter, setThreadFilter] = useLocalStorage<SidebarThreadFilter, unknown>(
-    THREAD_FILTER_KEY,
-    EMPTY_SIDEBAR_THREAD_FILTER,
-    SidebarThreadFilterSchema,
+  const [threadView, setThreadView] = useLocalStorage<SidebarThreadView, unknown>(
+    THREAD_VIEW_KEY,
+    DEFAULT_SIDEBAR_THREAD_VIEW,
+    SidebarThreadViewSchema,
   );
+  const [collapsedGroupList, setCollapsedGroupList] = useLocalStorage<readonly string[], unknown>(
+    COLLAPSED_GROUPS_KEY,
+    NO_COLLAPSED_GROUPS,
+    CollapsedGroupsSchema,
+  );
+  const collapsedGroups = new Set(collapsedGroupList);
+  const toggleCollapsedGroup = (groupKey: string) =>
+    setCollapsedGroupList((current) =>
+      current.includes(groupKey)
+        ? current.filter((key) => key !== groupKey)
+        : [...current, groupKey],
+    );
   const [projectScopeMenuState, dispatchProjectScopeMenu] = useReducer(
     reduceSidebarProjectScopeMenuState,
     { open: false, query: "" },
@@ -3023,6 +3140,7 @@ export default function Sidebar() {
   const {
     threads,
     workingShelfEnabled,
+    viewContext,
     pinnedThreads,
     draggableThreadKeys,
     activeReorderableThreadKeys,
@@ -3059,7 +3177,9 @@ export default function Sidebar() {
     serverConfigs,
     optimisticDrop,
     routeThreadKey,
-    threadFilter,
+    threadView,
+    projectGroupKeyByProjectKey,
+    projectRankByGroupKey,
   });
 
   const isSearchingThreads = threadSearchQuery.trim().length > 0;
@@ -3603,7 +3723,17 @@ export default function Sidebar() {
     const pinnedRows = rowsOf(pinnedThreads, "pinned");
     items.push(...pinnedRows);
     items.push({ kind: "marker", marker: "pinned-divider" });
-    const activeRows = rowsOf(activeThreads, "active");
+    const activeRows = rowsOf(
+      activeThreads.filter((thread) => {
+        const groupKey = activeGroupKeyOf(thread, viewContext);
+        return (
+          groupKey === null ||
+          !collapsedGroups.has(`${threadView}:${groupKey}`) ||
+          threadShellKey(thread) === routeThreadKey
+        );
+      }),
+      "active",
+    );
     items.push({ kind: "marker", marker: "active-placeholder" });
     items.push(...activeRows);
     if (workingThreads.length > 0) {
@@ -3683,6 +3813,7 @@ export default function Sidebar() {
           settledThreads,
           activeThreads,
           workingShelfEnabled,
+          viewContext,
         });
   const sidebarSortingStrategy = createSidebarSortingStrategy({
     items: sidebarListItems,
@@ -4584,7 +4715,6 @@ export default function Sidebar() {
   const newThreadShortcutLabel =
     shortcutLabelForCommand(keybindings, "chat.new") ??
     (projectGroups.length <= 1 ? shortcutLabelForCommand(keybindings, "chat.newLocal") : undefined);
-  const newThreadInProjectShortcutLabel = shortcutLabelForCommand(keybindings, "chat.newLocal");
   return (
     <>
       <ThreadContextDragGhost />
@@ -4638,12 +4768,6 @@ export default function Sidebar() {
                       ) : (
                         <ListFilterIcon className="size-4" />
                       )}
-                      {isSidebarThreadFilterActive(threadFilter) ? (
-                        <span
-                          aria-hidden
-                          className="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-primary ring-2 ring-sidebar"
-                        />
-                      ) : null}
                     </span>
                   </ComboboxTrigger>
                   <ComboboxPopup
@@ -4651,10 +4775,7 @@ export default function Sidebar() {
                     anchor={headerSearchRef}
                     className="max-w-[min(18rem,var(--available-width))] overflow-hidden"
                   >
-                    <SidebarThreadFilterSection
-                      filter={threadFilter}
-                      onFilterChange={setThreadFilter}
-                    />
+                    <SidebarThreadViewSection view={threadView} onViewChange={setThreadView} />
                     <span className="px-2.5 pt-2.5 text-xs font-medium text-muted-foreground">
                       Project
                     </span>
@@ -4737,7 +4858,6 @@ export default function Sidebar() {
               onNewThread={handleNewThreadClick}
               newThreadDisabled={projects.length === 0}
               newThreadShortcutLabel={newThreadShortcutLabel}
-              newThreadInProjectShortcutLabel={newThreadInProjectShortcutLabel}
               showNewThreadInProjectHint={projectGroups.length > 1}
               searchInputRef={threadSearchInputRef}
               searchQuery={threadSearchQuery}
@@ -4975,10 +5095,74 @@ export default function Sidebar() {
                           onDraftContextMenu={handleDraftContextMenu}
                         />,
                       ];
+                      const activeGroupCounts = new Map<string, number>();
+                      const activeGroupOrder: string[] = [];
+                      for (const thread of activeThreads) {
+                        const groupKey = activeGroupKeyOf(thread, viewContext);
+                        if (groupKey === null) continue;
+                        if (!activeGroupCounts.has(groupKey)) activeGroupOrder.push(groupKey);
+                        activeGroupCounts.set(groupKey, (activeGroupCounts.get(groupKey) ?? 0) + 1);
+                      }
+                      // Headers come from the group list, not the rows, so a collapsed
+                      // group keeps its header while its rows are hidden.
+                      let headersEmitted = 0;
+                      const emitGroupHeadersThrough = (lastGroupIndex: number) => {
+                        while (headersEmitted <= lastGroupIndex) {
+                          const groupKey = activeGroupOrder[headersEmitted]!;
+                          const storageKey = `${threadView}:${groupKey}`;
+                          const project =
+                            threadView === "project"
+                              ? (projectGroupByScopeKey.get(groupKey) ?? null)
+                              : null;
+                          const sample = activeThreads.find(
+                            (thread) => activeGroupKeyOf(thread, viewContext) === groupKey,
+                          );
+                          items.push(
+                            <SidebarActiveGroupHeader
+                              key={`active-group:${groupKey}`}
+                              label={
+                                threadView === "status"
+                                  ? STATUS_GROUP_LABEL[groupKey as SidebarStatusGroup]
+                                  : (project?.displayName ??
+                                    (sample
+                                      ? projectDisplayNameByKey.get(
+                                          `${sample.environmentId}:${sample.projectId}`,
+                                        )
+                                      : undefined) ??
+                                    "Project")
+                              }
+                              count={activeGroupCounts.get(groupKey) ?? 0}
+                              status={
+                                threadView === "status" ? (groupKey as SidebarStatusGroup) : null
+                              }
+                              project={project}
+                              first={headersEmitted === 0}
+                              expanded={!collapsedGroups.has(storageKey)}
+                              onToggle={() => toggleCollapsedGroup(storageKey)}
+                            />,
+                          );
+                          headersEmitted += 1;
+                        }
+                      };
                       for (const item of sidebarListItems) {
                         if (item.kind === "thread") {
-                          items.push(renderThreadRow(threadByKey.get(item.key)!, item.section));
+                          const thread = threadByKey.get(item.key)!;
+                          const groupKey =
+                            item.section === "active"
+                              ? activeGroupKeyOf(thread, viewContext)
+                              : null;
+                          if (groupKey !== null) {
+                            emitGroupHeadersThrough(activeGroupOrder.indexOf(groupKey));
+                          }
+                          items.push(renderThreadRow(thread, item.section));
                           continue;
+                        }
+                        if (
+                          item.marker === "working-header" ||
+                          item.marker === "snoozed-header" ||
+                          item.marker === "settled-header"
+                        ) {
+                          emitGroupHeadersThrough(activeGroupOrder.length - 1);
                         }
                         switch (item.marker) {
                           case "pinned-header":

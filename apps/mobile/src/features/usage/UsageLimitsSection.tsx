@@ -15,7 +15,7 @@ import {
   formatResetsIn,
   limitsNotice,
   paceOf,
-  remainingPercent,
+  spentPercent,
 } from "@t3tools/shared/usageLimits";
 import { type ReactNode, useEffect, useEffectEvent, useRef, useState } from "react";
 import { refreshUsageLimits } from "@t3tools/client-runtime/state/usage";
@@ -45,40 +45,39 @@ function WindowRow(props: {
   readonly now: number;
 }) {
   const { window, now } = props;
-  const remaining = remainingPercent(window);
+  const spent = spentPercent(window);
   const elapsed = elapsedShare(window, now);
-  const timeLeft = elapsed === null ? null : Math.round((1 - elapsed) * 100);
+  // The marker is now: a fill that stays left of it lasts until the reset.
+  const elapsedPercent = elapsed === null ? null : elapsed * 100;
   const pace = paceOf(window, now);
   const resetsIn = formatResetsIn(window, now);
   return (
     <View className="gap-1">
       <View className="flex-row items-baseline justify-between gap-3">
         <Text className="text-sm text-foreground">{window.label}</Text>
-        <Text className="text-sm font-t3-medium tabular-nums text-foreground">
-          {remaining}% left
-        </Text>
+        <Text className="text-sm font-t3-medium tabular-nums text-foreground">{spent}% used</Text>
       </View>
       <View className="h-3 justify-center">
         <View className="h-1.5 flex-row overflow-hidden rounded-full bg-subtle">
           <View
             className={
-              remaining <= 10
+              spent >= 90
                 ? "h-full rounded-full bg-red-500"
-                : remaining <= 30
+                : spent >= 70
                   ? "h-full rounded-full bg-amber-500"
                   : "h-full rounded-full bg-foreground"
             }
             style={[
-              { flex: remaining },
-              remaining > 30 && props.color ? { backgroundColor: props.color } : null,
+              { flex: spent },
+              spent < 70 && props.color ? { backgroundColor: props.color } : null,
             ]}
           />
-          <View style={{ flex: 100 - remaining }} />
+          <View style={{ flex: 100 - spent }} />
         </View>
-        {timeLeft !== null ? (
+        {elapsedPercent !== null ? (
           <View
             className="absolute top-0 bottom-0 w-px bg-foreground"
-            style={{ left: `${timeLeft}%`, opacity: 0.6 }}
+            style={{ left: `${elapsedPercent}%`, opacity: 0.6 }}
           />
         ) : null}
       </View>

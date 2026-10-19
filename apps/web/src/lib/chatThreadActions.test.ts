@@ -7,6 +7,7 @@ import {
 } from "@t3tools/contracts";
 import { describe, expect, it, vi } from "vite-plus/test";
 import {
+  resolveLastUsedProjectKey,
   resolveThreadActionProjectRef,
   hasExplicitComposerModelSelection,
   resolveNewDraftStartFromOrigin,
@@ -167,5 +168,57 @@ describe("chatThreadActions", () => {
 
     expect(didStart).toBe(false);
     expect(handleNewThread).not.toHaveBeenCalled();
+  });
+});
+
+describe("resolveLastUsedProjectKey", () => {
+  const thread = (
+    projectId: ProjectId,
+    overrides: Partial<Parameters<typeof resolveLastUsedProjectKey>[0][number]> = {},
+  ) => ({
+    environmentId: ENVIRONMENT_ID,
+    projectId,
+    latestUserAuthoredMessageAt: null,
+    latestUserMessageAt: null,
+    createdAt: "2026-10-01T00:00:00.000Z",
+    deletedAt: null,
+    ...overrides,
+  });
+
+  it("picks the project the user last wrote in", () => {
+    expect(
+      resolveLastUsedProjectKey([
+        thread(PROJECT_ID, { latestUserAuthoredMessageAt: "2026-10-02T00:00:00.000Z" }),
+        thread(FALLBACK_PROJECT_ID, { latestUserAuthoredMessageAt: "2026-10-03T00:00:00.000Z" }),
+      ]),
+    ).toBe(`${ENVIRONMENT_ID}:${FALLBACK_PROJECT_ID}`);
+  });
+
+  it("ignores agent wakes in favor of the user's own messages", () => {
+    expect(
+      resolveLastUsedProjectKey([
+        thread(PROJECT_ID, {
+          latestUserAuthoredMessageAt: "2026-10-02T00:00:00.000Z",
+          latestUserMessageAt: "2026-10-02T00:00:00.000Z",
+        }),
+        thread(FALLBACK_PROJECT_ID, {
+          latestUserAuthoredMessageAt: "2026-10-01T12:00:00.000Z",
+          latestUserMessageAt: "2026-10-05T00:00:00.000Z",
+        }),
+      ]),
+    ).toBe(`${ENVIRONMENT_ID}:${PROJECT_ID}`);
+  });
+
+  it("skips deleted threads and returns null without threads", () => {
+    expect(
+      resolveLastUsedProjectKey([
+        thread(PROJECT_ID, { latestUserAuthoredMessageAt: "2026-10-02T00:00:00.000Z" }),
+        thread(FALLBACK_PROJECT_ID, {
+          latestUserAuthoredMessageAt: "2026-10-03T00:00:00.000Z",
+          deletedAt: "2026-10-04T00:00:00.000Z",
+        }),
+      ]),
+    ).toBe(`${ENVIRONMENT_ID}:${PROJECT_ID}`);
+    expect(resolveLastUsedProjectKey([])).toBeNull();
   });
 });

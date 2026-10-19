@@ -67,6 +67,32 @@ export function hasExplicitComposerModelSelection(
   );
 }
 
+interface LastUsedThreadLike extends ThreadContextLike {
+  readonly latestUserAuthoredMessageAt?: string | null;
+  readonly latestUserMessageAt: string | null;
+  readonly createdAt: string;
+  readonly deletedAt: string | null;
+}
+
+/**
+ * `environmentId:projectId` of the thread the user last wrote in, so a new
+ * chat opens where the work happened instead of in the first sidebar project.
+ */
+export function resolveLastUsedProjectKey(
+  threads: ReadonlyArray<LastUsedThreadLike>,
+): string | null {
+  let latest: { readonly key: string; readonly at: number } | null = null;
+  for (const thread of threads) {
+    if (thread.deletedAt !== null) continue;
+    const at = Date.parse(
+      thread.latestUserAuthoredMessageAt ?? thread.latestUserMessageAt ?? thread.createdAt,
+    );
+    if (!Number.isFinite(at) || (latest !== null && at <= latest.at)) continue;
+    latest = { key: `${thread.environmentId}:${thread.projectId}`, at };
+  }
+  return latest?.key ?? null;
+}
+
 export function resolveThreadActionProjectRef(
   context: ChatThreadActionContext,
 ): ScopedProjectRef | null {

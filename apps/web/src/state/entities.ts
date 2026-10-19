@@ -24,6 +24,7 @@ import type {
 } from "@t3tools/contracts";
 import type { ThreadCheckpointSummary } from "@t3tools/client-runtime/state/thread-checkpoints";
 import { Atom } from "effect/reactivity";
+import { resolveLastUsedProjectKey } from "../lib/chatThreadActions";
 import { appAtomRegistry } from "../rpc/atomRegistry";
 import { environmentProjects } from "./projects";
 import { environmentPresentations } from "./presentation";
@@ -91,6 +92,16 @@ export function useEnvironmentThreadRefs(
       ? EMPTY_THREAD_REFS_ATOM
       : environmentThreadShells.environmentThreadRefsAtom(environmentId),
   );
+}
+
+// Only the key leaves the atom, so streamed shell updates do not re-render
+// every new-thread entry point.
+const lastUsedProjectKeyAtom = Atom.make((get) =>
+  resolveLastUsedProjectKey(get(environmentThreadShells.threadShellsAtom)),
+).pipe(Atom.withLabel("web-last-used-project-key"));
+
+export function useLastUsedProjectKey(): string | null {
+  return useAtomValue(lastUsedProjectKeyAtom);
 }
 
 export function useProjects(): ReadonlyArray<EnvironmentProject> {

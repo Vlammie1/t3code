@@ -29,6 +29,7 @@ import {
   ArrowDownUpIcon,
   CalendarArrowDownIcon,
   CalendarArrowUpIcon,
+  CalendarDaysIcon,
   ChevronDownIcon,
   ClockIcon,
   EyeIcon,
@@ -67,6 +68,7 @@ import {
   pullRequestEntryKey,
   pullRequestEntryViewer,
   rankPullRequestMatches,
+  groupPullRequestsByDate,
   sortPullRequestGroups,
   pullRequestEnvironmentSetKey,
   readPullRequestListSnapshot,
@@ -210,7 +212,8 @@ function PullRequestGroupHeader({
 }: {
   group: { key: string; label: string; entries: ReadonlyArray<unknown> };
 }) {
-  const Icon = GROUP_ICONS[group.key] ?? LayersIcon;
+  const Icon =
+    GROUP_ICONS[group.key] ?? (group.key.startsWith("date:") ? CalendarDaysIcon : LayersIcon);
   return (
     <div className="flex items-center gap-2 px-3 pb-1 text-xs font-medium text-muted-foreground/70">
       <Icon aria-hidden className="size-3.5 shrink-0" />
@@ -2108,7 +2111,7 @@ function usePullRequestDisplayGroups({
             : overridden,
       };
     });
-    return sortPullRequestGroups(
+    const sorted = sortPullRequestGroups(
       enriched,
       sort,
       text,
@@ -2116,6 +2119,8 @@ function usePullRequestDisplayGroups({
         entry.additions + entry.deletions > 0 || statsByRow.has(pullRequestDiffStatKey(entry)),
       involvement,
     );
+    // A search ranks by relevance, which date buckets would scatter.
+    return text.trim().length > 0 ? sorted : groupPullRequestsByDate(sorted, sort, new Date());
   })();
   const shownCount = displayGroups.reduce((count, group) => count + group.entries.length, 0);
   const hostActionsOf = pullRequestHostActions(hosts);

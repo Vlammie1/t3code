@@ -367,7 +367,9 @@ export function DraftHeroHeadline({
       </h1>
       {}
       {scratchWorkspaceRoot === null ? null : (
-        <p className="mt-2 flex h-6 items-center text-sm">
+        // Full width, so the trigger's percentage max-width resolves against the
+        // headline instead of its own text and stops clipping "No project".
+        <p className="mt-2 flex h-6 w-full items-center justify-center text-sm">
           {isScratchDraft ? projectSelector : orStartWithoutProject}
         </p>
       )}

@@ -9,7 +9,7 @@ import {
   cursorUsageWindowDetails,
   displayLimitWindows,
   formatResetsIn,
-  remainingPercent,
+  spentPercent,
   type LimitAccount,
   type LimitPoolWindow,
 } from "@t3tools/shared/usageLimits";
@@ -41,11 +41,11 @@ function accountName(account: LimitAccount) {
 }
 
 function AccountSegment({
-  remaining,
+  spent,
   color,
   pending,
 }: {
-  readonly remaining: number;
+  readonly spent: number;
   readonly color: string;
   readonly pending: boolean;
 }) {
@@ -70,15 +70,8 @@ function AccountSegment({
               <Path d="M-1 1L1 -1M0 6L6 0M5 7L7 5" stroke={color} strokeWidth={1} opacity={0.22} />
             </Pattern>
           </Defs>
-          {pending ? (
-            <Rect
-              x={`${remaining}%`}
-              width={`${100 - remaining}%`}
-              height="100%"
-              fill={`url(#${patternId})`}
-            />
-          ) : null}
-          <Rect width={`${remaining}%`} height="100%" fill={color} opacity={0.35} />
+          <Rect width={`${spent}%`} height="100%" fill={color} opacity={0.35} />
+          {pending ? <Rect width={`${spent}%`} height="100%" fill={`url(#${patternId})`} /> : null}
         </Svg>
       ) : null}
     </View>
@@ -123,9 +116,9 @@ function PoolWindowCard({
           <Text className="text-sm font-t3-medium text-foreground">{label ?? pool.label}</Text>
           <View className="flex-row items-baseline gap-1.5">
             <Text className="text-3xl font-t3-bold tabular-nums text-foreground">
-              {pool.remainingPercent}%
+              {pool.usedPercent}%
             </Text>
-            <Text className="text-sm text-foreground-muted">left</Text>
+            <Text className="text-sm text-foreground-muted">used</Text>
           </View>
         </View>
         {pool.pace ? (
@@ -148,13 +141,13 @@ function PoolWindowCard({
             <Pressable
               key={account.key}
               accessibilityRole="button"
-              accessibilityLabel={`Segment ${index + 1}, ${accountName(account)}, ${remainingPercent(window)}% left`}
+              accessibilityLabel={`Segment ${index + 1}, ${accountName(account)}, ${spentPercent(window)}% used`}
               accessibilityHint="Show account details"
               onPress={() => openAccount(account)}
               className="h-7 min-w-0 flex-1 overflow-hidden rounded-md bg-subtle"
             >
               <AccountSegment
-                remaining={remainingPercent(window)}
+                spent={spentPercent(window)}
                 color={color}
                 pending={Boolean(window.resetsAt)}
               />
@@ -176,7 +169,7 @@ function PoolWindowCard({
             <Pressable
               key={account.key}
               accessibilityRole="button"
-              accessibilityLabel={`Segment ${index + 1}, ${accountName(account)}, ${remainingPercent(window)}% left${resetsIn ? `, ${resetsIn}` : ""}${credits ? `, ${credits} reset credits banked` : ""}`}
+              accessibilityLabel={`Segment ${index + 1}, ${accountName(account)}, ${spentPercent(window)}% used${resetsIn ? `, ${resetsIn}` : ""}${credits ? `, ${credits} reset credits banked` : ""}`}
               accessibilityHint="Show account details"
               onPress={() => openAccount(account)}
               className="min-h-[44px] flex-row items-center gap-2 active:opacity-60"
@@ -193,7 +186,7 @@ function PoolWindowCard({
                 {accountName(account)}
               </Text>
               <Text className="text-sm font-t3-medium tabular-nums text-foreground">
-                {remainingPercent(window)}%
+                {spentPercent(window)}%
               </Text>
               <View className="flex-row items-center gap-1">
                 {resetsIn ? (
@@ -411,7 +404,7 @@ export function UsageLimitAccountScreen({ route }: AccountScreenProps) {
             <View className="gap-3 rounded-[24px] border-continuous bg-grouped-card p-4">
               <Text className="text-sm font-t3-medium text-foreground">{window.label}</Text>
               <Text className="text-3xl font-t3-bold tabular-nums text-foreground">
-                {remainingPercent(window)}% left
+                {spentPercent(window)}% used
               </Text>
               {window.resetsAt ? (
                 <Text selectable className="text-sm text-foreground-muted">

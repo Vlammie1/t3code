@@ -968,3 +968,66 @@ export function largestPullRequestReadCount(
   }
   return Math.max(0, ...counts.values());
 }
+
+export interface PullRequestDateGroup<Entry extends PullRequestListEntry = PullRequestListEntry> {
+  readonly key: string;
+  readonly label: string;
+  readonly entries: ReadonlyArray<Entry>;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Buckets the sorted rows by day, week, month: the involvement groups melt into one timeline,
+ * and each bucket keeps the rows in the order the reader sorted them. Creation dates for the
+ * newest/oldest sorts, last activity otherwise.
+ */
+export function groupPullRequestsByDate<Entry extends PullRequestListEntry>(
+  groups: ReadonlyArray<{ readonly entries: ReadonlyArray<Entry> }>,
+  sort: PullRequestListSort,
+  now: Date,
+): ReadonlyArray<PullRequestDateGroup<Entry>> {
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const buckets = new Map<string, { label: string; rank: number; entries: Entry[] }>();
+  for (const group of groups) {
+    for (const entry of group.entries) {
+      const at =
+        (sort === "newest" || sort === "oldest" ? toSortableTimestamp(entry.createdAt) : null) ??
+        toSortableTimestamp(entry.updatedAt) ??
+        toSortableTimestamp(entry.createdAt);
+      const bucket = (() => {
+        if (at === null) return { key: "undated", label: "Undated", rank: Number.MIN_SAFE_INTEGER };
+        if (at >= startOfToday) return { key: "today", label: "Today", rank: startOfToday };
+        if (at >= startOfToday - DAY_MS) {
+          return { key: "yesterday", label: "Yesterday", rank: startOfToday - DAY_MS };
+        }
+        if (at >= startOfToday - 6 * DAY_MS) {
+          return { key: "week", label: "This week", rank: startOfToday - 6 * DAY_MS };
+        }
+        if (at >= startOfMonth) return { key: "month", label: "This month", rank: startOfMonth };
+        const date = new Date(at);
+        const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
+        return {
+          key: `${monthStart.getFullYear()}-${monthStart.getMonth() + 1}`,
+          label: monthStart.toLocaleDateString("en-US", {
+            month: "long",
+            ...(monthStart.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }),
+          }),
+          rank: monthStart.getTime(),
+        };
+      })();
+      const existing = buckets.get(bucket.key);
+      if (existing === undefined) {
+        buckets.set(bucket.key, { label: bucket.label, rank: bucket.rank, entries: [entry] });
+      } else {
+        existing.entries.push(entry);
+      }
+    }
+  }
+  return [...buckets]
+    .toSorted(([, left], [, right]) =>
+      sort === "oldest" ? left.rank - right.rank : right.rank - left.rank,
+    )
+    .map(([key, bucket]) => ({ key: `date:${key}`, label: bucket.label, entries: bucket.entries }));
+}

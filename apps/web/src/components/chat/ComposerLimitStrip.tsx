@@ -7,7 +7,7 @@ import {
   elapsedShare,
   formatDuration,
   limitsNotice,
-  remainingPercent,
+  spentPercent,
 } from "@t3tools/shared/usageLimits";
 
 import { useNowMinute } from "../../hooks/useNowMinute";
@@ -15,14 +15,14 @@ import { cn } from "~/lib/utils";
 import { barColor } from "../usage/UsageLimits";
 import { ComposerBanner } from "./ComposerBanner";
 
-// Below these shares the bar switches from the provider colour to a status
+// Above these shares the bar switches from the provider colour to a status
 // colour, so a nearly spent window reads as a warning at a glance.
-const LOW_REMAINING_PERCENT = 20;
-const EMPTY_REMAINING_PERCENT = 5;
+const HIGH_SPENT_PERCENT = 80;
+const FULL_SPENT_PERCENT = 95;
 
-function fillColor(driver: ServerProvider["driver"], remaining: number): string {
-  if (remaining <= EMPTY_REMAINING_PERCENT) return "var(--destructive)";
-  if (remaining <= LOW_REMAINING_PERCENT) return "var(--warning)";
+function fillColor(driver: ServerProvider["driver"], spent: number): string {
+  if (spent >= FULL_SPENT_PERCENT) return "var(--destructive)";
+  if (spent >= HIGH_SPENT_PERCENT) return "var(--warning)";
   return barColor(driver);
 }
 
@@ -41,17 +41,18 @@ function LimitSegment(props: {
   readonly onOpen: () => void;
 }) {
   const { driver, window, now } = props;
-  const remaining = remainingPercent(window);
+  const spent = spentPercent(window);
   const resetsIn = resetsInLabel(window, now);
   const elapsed = elapsedShare(window, now);
-  // Where the fill would sit if the window were spent evenly over its length.
-  const evenPace = elapsed === null ? null : Math.round((1 - elapsed) * 100);
-  const color = fillColor(driver, remaining);
+  // The marker sits at the share of the window that has passed: a fill that
+  // stays left of it lasts until the reset.
+  const elapsedPercent = elapsed === null ? null : elapsed * 100;
+  const color = fillColor(driver, spent);
   return (
     <button
       type="button"
       onClick={props.onOpen}
-      aria-label={`${props.label}: ${remaining}% left${resetsIn ? `, resets in ${resetsIn}` : ""}`}
+      aria-label={`${props.label}: ${spent}% used${elapsedPercent === null ? "" : `, ${Math.round(elapsedPercent)}% of the window passed`}${resetsIn ? `, resets in ${resetsIn}` : ""}`}
       className="group/limit flex min-w-0 flex-col gap-1.5 rounded-lg px-2 py-1.5 text-start transition-colors hover:bg-foreground/5"
     >
       <span className="flex min-w-0 items-baseline gap-1.5 text-xs">
@@ -61,10 +62,10 @@ function LimitSegment(props: {
         <span
           className={cn(
             "ms-auto shrink-0 font-medium tabular-nums",
-            remaining <= LOW_REMAINING_PERCENT ? "text-warning-foreground" : "text-foreground",
+            spent >= HIGH_SPENT_PERCENT ? "text-warning-foreground" : "text-foreground",
           )}
         >
-          {remaining}%
+          {spent}%
         </span>
         {resetsIn ? (
           <span className="shrink-0 text-muted-foreground/70 tabular-nums">{resetsIn}</span>
@@ -74,16 +75,16 @@ function LimitSegment(props: {
         <span
           className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-500 ease-out"
           style={{
-            width: `${remaining}%`,
+            width: `${spent}%`,
             backgroundColor: color,
             boxShadow: `0 0 8px color-mix(in srgb, ${color} 55%, transparent)`,
           }}
         />
-        {evenPace !== null ? (
+        {elapsedPercent !== null ? (
           <span
             aria-hidden
-            className="absolute -inset-y-0.5 w-0.5 -translate-x-1/2 rounded-full bg-foreground/45"
-            style={{ left: `${evenPace}%` }}
+            className="absolute -inset-y-0.5 w-0.5 -translate-x-1/2 rounded-full bg-foreground/60"
+            style={{ left: `${elapsedPercent}%` }}
           />
         ) : null}
       </span>

@@ -767,11 +767,12 @@ export function isSidebarNestedLinkClick(target: EventTarget | null): boolean {
   return nodeClosest(parent, "a[href]") !== null;
 }
 
+// A new thread opens in the current or last used project; Shift asks for one.
 export function shouldCreateNewThreadInCurrentProject(
   shiftKey: boolean,
   projectGroupCount: number,
 ): boolean {
-  return shiftKey || projectGroupCount <= 1;
+  return !shiftKey || projectGroupCount <= 1;
 }
 
 export function orderItemsByPreferredIds<TItem, TId>(input: {
@@ -942,59 +943,44 @@ export function resolveSidebarThreadStatus(thread: SidebarThreadStatusInput): Si
 }
 
 /**
- * The three buckets the inbox is ordered by: what is running, what needs the
- * user, and what is finished. Failures and usage limits count as needing the
- * user, since nothing moves until someone acts on them.
+ * The three buckets the status view splits the inbox into: what is running,
+ * what needs the user, and what is finished. A completion or failure the user
+ * has not opened since it ended still needs them; once seen it is finished.
+ * Approvals and questions need the user until they are answered.
  */
 export type SidebarStatusGroup = "active" | "attention" | "finished";
 
-const SIDEBAR_STATUS_GROUP_RANK: Record<SidebarStatusGroup, number> = {
-  active: 0,
-  attention: 1,
-  finished: 2,
-};
+export const SIDEBAR_STATUS_GROUPS: readonly SidebarStatusGroup[] = [
+  "active",
+  "attention",
+  "finished",
+];
 
-export function resolveSidebarStatusGroup(thread: SidebarThreadStatusInput): SidebarStatusGroup {
+export function resolveSidebarStatusGroup(thread: ThreadStatusInput): SidebarStatusGroup {
   const status = resolveSidebarThreadStatus(thread);
   if (status === "working" || status === "waiting") return "active";
-  if (status === "ready") return "finished";
-  return "attention";
+  if (status === "approval" || status === "input") return "attention";
+  return hasUnseenCompletion(thread) || hasUnseenFailure(thread) ? "attention" : "finished";
 }
 
-/** Stable: rows keep their existing order inside each status group. */
-export function sortThreadsByStatusGroup<T extends SidebarThreadStatusInput>(
+/** Stable: rows keep their existing order inside each group. */
+export function sortThreadsByGroupRank<T>(
   threads: readonly T[],
+  rankOf: (thread: T) => number,
 ): T[] {
   return threads
-    .map((thread, index) => ({
-      thread,
-      index,
-      rank: SIDEBAR_STATUS_GROUP_RANK[resolveSidebarStatusGroup(thread)],
-    }))
+    .map((thread, index) => ({ thread, index, rank: rankOf(thread) }))
     .toSorted((left, right) => left.rank - right.rank || left.index - right.index)
     .map((entry) => entry.thread);
 }
 
-export interface SidebarThreadFilter {
-  readonly groups: readonly SidebarStatusGroup[];
-  readonly unreadOnly: boolean;
-}
+/**
+ * How the inbox is laid out: split by status, grouped under projects, or one
+ * list with the newest first.
+ */
+export type SidebarThreadView = "status" | "project" | "recent";
 
-export const EMPTY_SIDEBAR_THREAD_FILTER: SidebarThreadFilter = { groups: [], unreadOnly: false };
-
-export function isSidebarThreadFilterActive(filter: SidebarThreadFilter): boolean {
-  return filter.groups.length > 0 || filter.unreadOnly;
-}
-
-export function matchesSidebarThreadFilter(
-  thread: ThreadStatusInput,
-  filter: SidebarThreadFilter,
-): boolean {
-  if (filter.groups.length > 0 && !filter.groups.includes(resolveSidebarStatusGroup(thread))) {
-    return false;
-  }
-  return !filter.unreadOnly || hasUnseenCompletion(thread) || hasUnseenFailure(thread);
-}
+export const DEFAULT_SIDEBAR_THREAD_VIEW: SidebarThreadView = "status";
 
 export type SidebarV2TopStatusKind =
   | "approval"
