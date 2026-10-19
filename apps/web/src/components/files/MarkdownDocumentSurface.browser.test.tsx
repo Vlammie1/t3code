@@ -39,7 +39,7 @@ const contents = "# Plan\n\nDe groeimotor is de docent, niet de schoolleider.\n"
 let root: Root | null = null;
 let host: HTMLDivElement;
 
-async function mount() {
+async function mount(text = contents) {
   host = document.createElement("div");
   host.style.cssText = "width: 1200px; height: 800px; display: flex;";
   document.body.append(host);
@@ -51,7 +51,7 @@ async function mount() {
           environmentId={environmentId}
           cwd="/workspace"
           relativePath="plan.md"
-          contents={contents}
+          contents={text}
           threadRef={threadRef}
           draft={false}
           readOnly={false}
@@ -146,5 +146,23 @@ describe("MarkdownDocumentSurface", () => {
     expect(saveChange.mock.calls.at(-1)?.[0]).toBe(
       "# Plan\n\nDe groeimotor is de docent, niet de **schoolleider**.\n",
     );
+  });
+
+  it("writes nothing when a document is only opened", async () => {
+    await mount("# Plan\n\nSee _this_ and * this list\n");
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    });
+
+    expect(saveChange).not.toHaveBeenCalled();
+  });
+
+  it("opens a document it cannot write back intact for comments only", async () => {
+    await mount('<a id="anchor"></a>\n\n# Plan\n\nDe groeimotor is de docent.\n');
+    await selectText("de docent");
+
+    const toolbar = host.querySelector("[data-markdown-toolbar]");
+    expect(toolbar?.querySelector('[aria-label="Comment"]')).not.toBeNull();
+    expect(toolbar?.querySelector('[aria-label="Bold"]')).toBeNull();
   });
 });

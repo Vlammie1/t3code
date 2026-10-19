@@ -35,7 +35,7 @@ import { useThreadShell } from "~/state/entities";
 import { threadEnvironment } from "~/state/threads";
 import { useOrchestrationCommand } from "~/state/use-orchestration-command";
 
-import { markdownDocumentExtensions } from "./markdownDocumentEditor";
+import { keepsMarkdownContent, markdownDocumentExtensions } from "./markdownDocumentEditor";
 import {
   type MarkdownComment,
   agentCommentRequest,
@@ -175,7 +175,11 @@ const TEXT_STYLES = [
   { label: "Heading 3", level: 3 },
 ] as const;
 
-function SelectionToolbar(props: { readonly editor: Editor; readonly onComment: () => void }) {
+function SelectionToolbar(props: {
+  readonly editor: Editor;
+  readonly formatting: boolean;
+  readonly onComment: () => void;
+}) {
   const { editor } = props;
   const state = useEditorState({
     editor,
@@ -199,6 +203,16 @@ function SelectionToolbar(props: { readonly editor: Editor; readonly onComment: 
     else chain().extendMarkRange("link").setLink({ href }).run();
     setLinkDraft(null);
   };
+
+  if (!props.formatting) {
+    return (
+      <div className="flex items-center p-1">
+        <ToolbarButton label="Comment" onPress={props.onComment}>
+          <CommentAddIcon className="size-4" />
+        </ToolbarButton>
+      </div>
+    );
+  }
 
   if (linkDraft !== null) {
     return (
@@ -528,14 +542,16 @@ export function MarkdownDocumentSurface(props: {
   });
   const parsed = parseCommentedMarkdown(contents);
   // An unreadable comments block would be lost on the next write, so it locks the document.
-  const editable = !props.readOnly && parsed.commentsWritable;
+  const canComment = !props.readOnly && parsed.commentsWritable;
+  const [lossy, setLossy] = useState(false);
+  const canEdit = canComment && !lossy;
   const agentName = threadShell
     ? /claude/i.test(threadShell.providerInstanceId)
       ? "Claude"
       : "the agent"
     : null;
 
-  const [selectionAnchor, setSelectionAnchor] = useState<SelectionAnchor | null>(null);
+  const [selection, setSelection] = useState<CommentDraft | null>(null);
   const [commentDraft, setCommentDraft] = useState<CommentDraft | null>(null);
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
   const [marginLayout, setMarginLayout] = useState(false);
@@ -549,8 +565,10 @@ export function MarkdownDocumentSurface(props: {
   const railRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef(new Map<string, HTMLDivElement>());
   const rangesRef = useRef(new Map<string, Range>());
-  /** The body the editor holds, so a file change that only echoes our own save is ignored. */
-  const editorBodyRef = useRef(parsed.body);
+  /** The body loaded into the editor, so a file change that only echoes a save is ignored. */
+  const loadedBodyRef = useRef(parsed.body.trimEnd());
+  /** The editor's own markdown for what was loaded; only a different text is an edit to save. */
+  const baselineRef = useRef<string | null>(null);
   const saveTimerRef = useRef<number | null>(null);
 
   const currentContents = () =>
@@ -572,60 +590,31 @@ export function MarkdownDocumentSurface(props: {
   // StrictMode creates and destroys a first editor, so the ref follows the editor that
   // reports events rather than the one that was created first.
   const editorRef = useRef<Editor | null>(null);
-  const anchorFor = (from: number, to: number): SelectionAnchor | null => {
-    const current = editorRef.current;
-    const layout = layoutRef.current;
-    if (!current || !layout) return null;
-    const origin = layout.getBoundingClientRect();
-    const start = current.view.coordsAtPos(from);
-    const end = current.view.coordsAtPos(to);
-    return {
-      top: start.top - origin.top,
-      bottom: end.bottom - origin.top,
-      left: Math.max(0, start.left - origin.left),
-    };
-  };
   const flushSave = useStableCallback(() => {
     if (saveTimerRef.current !== null) {
       window.clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
     }
     const current = editorRef.current;
-    if (!current || current.isDestroyed) return;
-    const body = current.getMarkdown();
+    if (!current || current.isDestroyed || !canEdit) return;
+    const body = current.getMarkdown().trimEnd();
+    if (body === baselineRef.current) return;
     const file = parseCommentedMarkdown(currentContents());
     if (!file.commentsWritable) return;
-    editorBodyRef.current = body;
+    loadedBodyRef.current = body;
+    baselineRef.current = body;
     const hadBlock = file.comments.length > 0 || file.body !== currentContents();
-    writeContents(
-      hadBlock ? serializeCommentedMarkdown(body, file.comments) : `${body.trimEnd()}\n`,
-    );
+    writeContents(hadBlock ? serializeCommentedMarkdown(body, file.comments) : `${body}\n`);
   });
   const scheduleSave = useStableCallback(() => {
     if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
     saveTimerRef.current = window.setTimeout(flushSave, SAVE_DELAY_MS);
   });
-  const readSelection = useStableCallback(() => {
-    const current = editorRef.current;
-    if (!current) return;
-    const { from, to, empty } = current.state.selection;
-    if (empty || !current.isFocused) {
-      setSelectionAnchor(null);
-      return;
-    }
-    setSelectionAnchor(anchorFor(from, to));
-  });
   const startComment = useStableCallback(() => {
-    const current = editorRef.current;
-    if (!current || !editable) return;
-    const { from, to, empty } = current.state.selection;
-    if (empty) return;
-    const quote = normalizeCommentQuote(current.state.doc.textBetween(from, to, " ", " "));
-    const anchor = anchorFor(from, to);
-    if (quote === "" || !anchor) return;
-    setCommentDraft({ quote, anchor });
+    if (!selection || !canComment) return;
+    setCommentDraft(selection);
     setActiveCommentId(null);
-    setSelectionAnchor(null);
+    setSelection(null);
   });
 
   const editor = useEditor(
@@ -633,7 +622,7 @@ export function MarkdownDocumentSurface(props: {
       extensions: markdownDocumentExtensions(),
       content: parsed.body,
       contentType: "markdown",
-      editable,
+      editable: false,
       editorProps: {
         attributes: {
           class: "chat-markdown markdown-document-editor",
@@ -660,17 +649,7 @@ export function MarkdownDocumentSurface(props: {
       onTransaction: ({ editor: live }) => {
         editorRef.current = live;
       },
-      onFocus: ({ editor: live }) => {
-        editorRef.current = live;
-      },
       onUpdate: () => scheduleSave(),
-      onSelectionUpdate: () => readSelection(),
-      onBlur: ({ event }) => {
-        // The toolbar and its menus take focus; only a blur elsewhere hides it.
-        const next = event.relatedTarget as HTMLElement | null;
-        if (next?.closest("[data-markdown-toolbar], [data-slot=menu-popup]")) return;
-        setSelectionAnchor(null);
-      },
     },
     [],
   );
@@ -686,19 +665,68 @@ export function MarkdownDocumentSurface(props: {
     [flushSave],
   );
 
-  // A change from elsewhere, such as an agent editing the file, replaces the
-  // editor's text unless it only echoes what the editor saved.
+  // Loads the file into the editor, and again when it changes elsewhere, such as
+  // an agent editing it, unless the change only echoes the editor's own save.
+  // The editor writes the whole file back, so a file whose markdown it cannot
+  // write back intact (raw HTML, for one) stays read-only here; comments still work.
   useEffect(() => {
     if (!editor || editor.isDestroyed) return;
-    if (parsed.body.trimEnd() === editorBodyRef.current.trimEnd()) return;
-    if (saveTimerRef.current !== null) return;
-    editorBodyRef.current = parsed.body;
-    editor.commands.setContent(parsed.body, { contentType: "markdown", emitUpdate: false });
+    const body = parsed.body.trimEnd();
+    if (body !== loadedBodyRef.current) {
+      if (saveTimerRef.current !== null) return;
+      editor.commands.setContent(parsed.body, { contentType: "markdown", emitUpdate: false });
+      loadedBodyRef.current = body;
+    }
+    const roundTrip = editor.getMarkdown().trimEnd();
+    baselineRef.current = roundTrip;
+    setLossy(!keepsMarkdownContent(parsed.body, roundTrip));
   }, [editor, parsed.body]);
 
   useEffect(() => {
-    if (editor && !editor.isDestroyed) editor.setEditable(editable);
-  }, [editor, editable]);
+    if (editor && !editor.isDestroyed) editor.setEditable(canEdit);
+  }, [editor, canEdit]);
+
+  // The browser's own selection drives the toolbar, so commenting also works where
+  // the editor is read-only.
+  useEffect(() => {
+    let frame = 0;
+    const read = () => {
+      frame = 0;
+      const root = documentRef.current;
+      const layout = layoutRef.current;
+      const current = window.getSelection();
+      if (!root || !layout || !current || current.isCollapsed || current.rangeCount === 0) {
+        setSelection(null);
+        return;
+      }
+      const range = current.getRangeAt(0);
+      const quote = normalizeCommentQuote(current.toString());
+      if (!root.contains(range.commonAncestorContainer) || quote === "") {
+        setSelection(null);
+        return;
+      }
+      const rects = range.getClientRects();
+      const first = rects[0] ?? range.getBoundingClientRect();
+      const last = rects[rects.length - 1] ?? first;
+      const origin = layout.getBoundingClientRect();
+      setSelection({
+        quote,
+        anchor: {
+          top: first.top - origin.top,
+          bottom: last.bottom - origin.top,
+          left: Math.max(0, first.left - origin.left),
+        },
+      });
+    };
+    const onSelectionChange = () => {
+      if (frame === 0) frame = window.requestAnimationFrame(read);
+    };
+    document.addEventListener("selectionchange", onSelectionChange);
+    return () => {
+      document.removeEventListener("selectionchange", onSelectionChange);
+      if (frame !== 0) window.cancelAnimationFrame(frame);
+    };
+  }, []);
 
   const askAgent = (comment: MarkdownComment, message: string) => {
     if (!threadShell) {
@@ -878,7 +906,7 @@ export function MarkdownDocumentSurface(props: {
       comment={comment}
       active={activeCommentId === comment.id}
       anchored={anchoredIds.has(comment.id)}
-      writable={editable}
+      writable={canComment}
       floating={marginLayout}
       agentName={agentName}
       onActivate={() => setActiveCommentId(comment.id)}
@@ -908,6 +936,11 @@ export function MarkdownDocumentSurface(props: {
               The comments block at the end of this file cannot be read. Fix it in the source view
               to comment or edit here.
             </p>
+          ) : lossy && canComment ? (
+            <p className="mb-6 rounded-xl bg-foreground/5 px-3 py-2 text-xs text-muted-foreground">
+              Saving from this view would change parts of this file, such as HTML, so it opens for
+              reading and comments. Edit it in the source view.
+            </p>
           ) : null}
           <div
             ref={documentRef}
@@ -932,19 +965,19 @@ export function MarkdownDocumentSurface(props: {
           </div>
         ) : null}
 
-        {selectionAnchor && editor && editable && !commentDraft ? (
+        {selection && editor && canComment && !commentDraft ? (
           <div
             data-markdown-toolbar
             className="absolute z-20 rounded-xl bg-popover shadow-lg ring-1 ring-border"
             style={{
-              top: Math.max(0, selectionAnchor.top - 48),
-              left: popoverLeft(selectionAnchor, TOOLBAR_WIDTH_PX),
+              top: Math.max(0, selection.anchor.top - 48),
+              left: popoverLeft(selection.anchor, canEdit ? TOOLBAR_WIDTH_PX : 48),
             }}
             onMouseDown={(event) => {
               if (!(event.target as HTMLElement).closest("input")) event.preventDefault();
             }}
           >
-            <SelectionToolbar editor={editor} onComment={startComment} />
+            <SelectionToolbar editor={editor} formatting={canEdit} onComment={startComment} />
           </div>
         ) : null}
 

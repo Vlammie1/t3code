@@ -20,3 +20,18 @@ export function markdownDocumentExtensions() {
     Markdown.configure({ markedOptions: { gfm: true } }),
   ];
 }
+
+// Characters whose spelling the editor may change without changing the content:
+// list markers, emphasis markers, escapes, table pipes and alignment, headings.
+const MARKDOWN_SYNTAX_PATTERN = /[\s\\|\-*_+#>`~:]/g;
+
+/**
+ * Whether the editor's markdown for a document says the same as the file: only
+ * whitespace and syntax spelling may differ. Raw HTML the editor drops, such as
+ * an anchor, makes this false.
+ */
+export function keepsMarkdownContent(original: string, written: string): boolean {
+  return (
+    original.replace(MARKDOWN_SYNTAX_PATTERN, "") === written.replace(MARKDOWN_SYNTAX_PATTERN, "")
+  );
+}

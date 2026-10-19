@@ -338,7 +338,9 @@ On web and desktop, Markdown files open as a document that takes most of the win
 chat in a narrow column beside it. Type in it like any editor; it saves as you go. Selecting
 text shows a toolbar for comments, text style, bold, italic, underline, strikethrough, code,
 highlight, lists and links. Switch to source view to edit the Markdown directly. Saving writes
-the whole file back as Markdown, so spacing such as table column padding can change.
+the whole file back as Markdown, so spacing such as table column padding can change; opening a
+file without editing it never saves. A file with content the document view cannot write back,
+such as HTML, opens for reading and comments only.
 
 Choose **Comment** in the toolbar, or press `Ctrl+Alt+M` (`Cmd+Option+M` on Mac), to comment on
 the selected text. With **Send to Claude** checked, or a comment that starts with `@Claude`,

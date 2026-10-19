@@ -2,7 +2,7 @@ import { resolveExtensions } from "@tiptap/core";
 import { MarkdownManager } from "@tiptap/markdown";
 import { describe, expect, it } from "vite-plus/test";
 
-import { markdownDocumentExtensions } from "./markdownDocumentEditor";
+import { keepsMarkdownContent, markdownDocumentExtensions } from "./markdownDocumentEditor";
 
 function roundTrip(markdown: string): string {
   const manager = new MarkdownManager({
@@ -57,5 +57,13 @@ describe("markdown document editor", () => {
     expect(output).toContain("==gemarkeerd==");
     // A second save writes the same text, so the file does not drift with each edit.
     expect(roundTrip(output)).toBe(output);
+  });
+
+  it("tells a document it can write back intact from one it would change", () => {
+    const plain = "# Plan\n\n* One\n* Two\n\nSee __bold__ and file_name.\n";
+    expect(keepsMarkdownContent(plain, roundTrip(plain))).toBe(true);
+
+    const withAnchor = '<a id="one-problem"></a>\n\n## Solve one problem\n';
+    expect(keepsMarkdownContent(withAnchor, roundTrip(withAnchor))).toBe(false);
   });
 });
