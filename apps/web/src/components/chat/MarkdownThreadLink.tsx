@@ -2,7 +2,7 @@ import { scopeProjectRef, scopeThreadRef } from "@t3tools/client-runtime/environ
 import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { formatThreadLink, percentDecodedThreadLinkId } from "@t3tools/shared/threadLinks";
 import { Link } from "@tanstack/react-router";
-import { MessageSquareTextIcon } from "lucide-react";
+import { MessageSquareTextIcon } from "~/components/appIcons";
 
 import { useProject, useThreadShell } from "../../state/entities";
 import { ProjectFavicon } from "../ProjectFavicon";

@@ -5,7 +5,7 @@ import { useAtomValue } from "@effect/atom-react";
 import { shortcutLabelForCommand } from "../keybindings";
 import { primaryServerKeybindingsAtom } from "../state/server";
 import type { EnvironmentId } from "@t3tools/contracts";
-import { ScaleIcon } from "lucide-react";
+import { ScaleIcon } from "~/components/appIcons";
 import { memo } from "react";
 
 import type { EnvironmentOption } from "./BranchToolbar.logic";

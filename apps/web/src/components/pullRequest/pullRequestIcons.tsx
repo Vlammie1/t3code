@@ -5,9 +5,9 @@ import {
   GitPullRequestDraftIcon,
   LayersIcon,
   Link2Icon,
-  Unlink2Icon,
   TriangleAlertIcon,
-} from "lucide-react";
+  Unlink2Icon,
+} from "~/components/appIcons";
 import type { PullRequestState } from "@t3tools/contracts";
 
 export const PullRequestGlyph = {

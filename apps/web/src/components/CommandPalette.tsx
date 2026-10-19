@@ -66,8 +66,8 @@ import {
   FolderGit2Icon,
   FolderIcon,
   FolderPlusIcon,
-  MessageSquareDashedIcon,
   LinkIcon,
+  MessageSquareDashedIcon,
   MessageSquareIcon,
   MonitorIcon,
   MoonIcon,
@@ -77,7 +77,7 @@ import {
   SquarePenIcon,
   SunIcon,
   TextSearchIcon,
-} from "lucide-react";
+} from "~/components/appIcons";
 import { requestThreadFindOpen } from "./chat/threadFindActionBus";
 import {
   useDeferredValue,

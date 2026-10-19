@@ -18,7 +18,7 @@ import {
   ListChecksIcon,
   PlayIcon,
   WrenchIcon,
-} from "lucide-react";
+} from "~/components/appIcons";
 import React, {
   type FormEvent,
   type KeyboardEvent,

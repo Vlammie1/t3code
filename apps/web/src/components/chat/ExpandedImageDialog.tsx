@@ -1,8 +1,13 @@
 import { memo, useEffect, useRef, useState, type ReactNode, type KeyboardEvent } from "react";
-import { ChevronLeftIcon, ChevronRightIcon, XIcon } from "lucide-react";
-import { Image as ImageGlyph, Text as TextGlyph } from "lucide";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  Image as ImageGlyph,
+  Text as TextGlyph,
+  XIcon,
+} from "~/components/appIcons";
 import { Button } from "../ui/button";
-import { MorphIcon } from "~/components/MorphIcon";
+import { SwapIcon } from "~/components/SwapIcon";
 import { Dialog, DialogPopup, DialogTitle } from "../ui/dialog";
 import type { ExpandedImageItem, ExpandedImagePreview } from "./ExpandedImagePreview";
 import { resolveExternalWebLinkHost } from "./externalLinkContextMenu";
@@ -257,7 +262,7 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
                       />
                     }
                   >
-                    <MorphIcon
+                    <SwapIcon
                       className="size-3"
                       aria-hidden="true"
                       icon={showingAccessibilityDetails ? ImageGlyph : TextGlyph}

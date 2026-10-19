@@ -18,7 +18,7 @@ import {
   mcpAppFileName,
   type McpAppReference,
 } from "@t3tools/shared/mcpApp";
-import { Minimize2Icon } from "lucide-react";
+import { Minimize2Icon } from "~/components/appIcons";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 

@@ -267,15 +267,15 @@ import { PersistentThreadTerminalDrawer } from "./PersistentThreadTerminals";
 import {
   AlarmClockIcon,
   CheckCircle2Icon,
-  MessageCircleIcon,
-  PaperclipIcon,
   ChevronDownIcon,
   DownloadIcon,
   GitBranchIcon,
+  MessageCircleIcon,
+  PaperclipIcon,
   ShieldQuestionIcon,
   TargetIcon,
   WifiOffIcon,
-} from "lucide-react";
+} from "~/components/appIcons";
 import { cn, randomUUID } from "~/lib/utils";
 import { COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS } from "~/workspaceTitlebar";
 import { stackedThreadToast, toastManager } from "./ui/toast";

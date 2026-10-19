@@ -31,10 +31,10 @@ import {
   FileDiffIcon,
   GitBranchPlusIcon,
   GitCommitIcon,
+  GlobeIcon,
   InfoIcon,
   LockIcon,
-  GlobeIcon,
-} from "lucide-react";
+} from "~/components/appIcons";
 import { Radio as RadioPrimitive } from "@base-ui/react/radio";
 import { RadioGroup } from "~/components/ui/radio-group";
 import { Spinner } from "~/components/ui/spinner";

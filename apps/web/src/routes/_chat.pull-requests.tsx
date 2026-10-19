@@ -26,6 +26,7 @@ import type {
 import { useAtomValue } from "@effect/atom-react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
+  type AppIcon,
   ArrowDownUpIcon,
   CalendarArrowDownIcon,
   CalendarArrowUpIcon,
@@ -35,15 +36,14 @@ import {
   EyeIcon,
   LayersIcon,
   ListChecksIcon,
-  PenLineIcon,
-  UsersIcon,
-  Plug2Icon,
   Maximize2Icon,
   Minimize2Icon,
+  PenLineIcon,
+  Plug2Icon,
   SearchIcon,
   UserLockIcon,
-  type LucideIcon,
-} from "lucide-react";
+  UsersIcon,
+} from "~/components/appIcons";
 import {
   useEffect,
   useEffectEvent,
@@ -201,7 +201,7 @@ export interface PullRequestsSearch extends PullRequestListPreferences {
   readonly selectedEnvironmentId?: EnvironmentId;
 }
 
-const GROUP_ICONS: Record<string, LucideIcon> = {
+const GROUP_ICONS: Record<string, AppIcon> = {
   authored: PenLineIcon,
   reviewRequested: EyeIcon,
   others: UsersIcon,

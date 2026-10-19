@@ -2,7 +2,7 @@ import { mergeProps } from "@base-ui/react/merge-props";
 import { Select as SelectPrimitive } from "@base-ui/react/select";
 import { useRender } from "@base-ui/react/use-render";
 import type { ComponentProps, ComponentType, SVGProps } from "react";
-import { ChevronDownIcon } from "lucide-react";
+import { ChevronDownIcon } from "~/components/appIcons";
 
 import { cn } from "~/lib/utils";
 import { Separator } from "../ui/separator";
@@ -82,7 +82,6 @@ export function ComposerControlChevron({
         className,
       )}
       data-composer-control-chevron
-      strokeWidth={2.25}
     />
   );
 }

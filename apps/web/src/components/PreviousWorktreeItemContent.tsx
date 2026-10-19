@@ -1,4 +1,4 @@
-import { HistoryIcon } from "lucide-react";
+import { HistoryIcon } from "~/components/appIcons";
 
 import { MiddleTruncate } from "./ui/middle-truncate";
 

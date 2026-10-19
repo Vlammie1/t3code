@@ -16,7 +16,7 @@ import {
   LinkIcon,
   MoreHorizontalIcon,
   PlusIcon,
-} from "lucide-react";
+} from "~/components/appIcons";
 import { LegendList } from "@legendapp/list/react";
 import { memo, useState } from "react";
 

@@ -26,7 +26,6 @@ import { restrictToFirstScrollableAncestor, restrictToHorizontalAxis } from "@dn
 import { horizontalListSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
-  Smartphone,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -35,9 +34,11 @@ import {
   Globe2,
   Images,
   Plus,
+  Smartphone,
   TerminalSquare,
-} from "lucide-react";
-import { Volume2, VolumeOff } from "lucide";
+  Volume2,
+  VolumeOff,
+} from "~/components/appIcons";
 import {
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
@@ -57,7 +58,7 @@ import { resolveShortcutCommand, type ShortcutMatchContext } from "~/keybindings
 import { readLocalApi } from "~/localApi";
 import { useStableCallback } from "~/hooks/useStableCallback";
 import { Button } from "~/components/ui/button";
-import { MorphIcon } from "~/components/MorphIcon";
+import { SwapIcon } from "~/components/SwapIcon";
 import { AndroidIcon, AppleIcon } from "~/components/Icons";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 import { Kbd } from "~/components/ui/kbd";
@@ -892,7 +893,7 @@ function RightPanelTab(
                     .catch(() => undefined);
                 }}
               >
-                <MorphIcon className="size-3" icon={audio === "muted" ? VolumeOff : Volume2} />
+                <SwapIcon className="size-3" icon={audio === "muted" ? VolumeOff : Volume2} />
               </button>
             }
           />

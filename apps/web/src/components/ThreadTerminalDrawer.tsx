@@ -17,7 +17,7 @@ import {
   SquareSplitVertical,
   TerminalSquare,
   Trash2,
-} from "lucide-react";
+} from "~/components/appIcons";
 import {
   AuthPreviewOperateScope,
   AuthOrchestrationOperateScope,

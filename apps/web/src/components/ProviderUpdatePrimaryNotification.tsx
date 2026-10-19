@@ -1,6 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useAtomValue } from "@effect/atom-react";
-import { DownloadIcon } from "lucide-react";
+import { DownloadIcon } from "~/components/appIcons";
 import { useEffect, useRef } from "react";
 import {
   AuthProvidersManageScope,
@@ -55,7 +55,7 @@ function ProviderUpdateToastIcon({ provider }: { provider: ServerProvider }) {
         iconClassName="size-4"
       />
       <span className="absolute -right-1 -bottom-1 z-40 inline-flex size-3 items-center justify-center rounded-full bg-popover">
-        <DownloadIcon aria-hidden="true" className="size-2.5 text-success" strokeWidth={2.5} />
+        <DownloadIcon aria-hidden="true" className="size-2.5 text-success" />
       </span>
     </span>
   );

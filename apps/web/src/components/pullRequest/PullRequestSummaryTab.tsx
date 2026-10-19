@@ -16,7 +16,7 @@ import {
   ListFilterIcon,
   TagIcon,
   UsersIcon,
-} from "lucide-react";
+} from "~/components/appIcons";
 import * as Schema from "effect/Schema";
 import { useRef, useState, type ReactNode } from "react";
 

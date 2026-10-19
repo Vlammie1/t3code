@@ -42,7 +42,7 @@ vi.mock("~/composerHandleContext", () => ({ useComposerHandleContext: () => null
 vi.mock("~/fileContextMenu", () => ({ useFileContextMenu: () => ({}) }));
 vi.mock("~/localApi", () => ({ readLocalApi: () => undefined }));
 vi.mock("~/components/ui/toast", () => ({ toastManager: { add: vi.fn() } }));
-vi.mock("~/components/MorphIcon", () => ({ MorphIcon: () => null }));
+vi.mock("~/components/SwapIcon", () => ({ SwapIcon: () => null }));
 vi.mock("~/components/ui/tooltip", () => ({
   Tooltip: ({ children }: { children: ReactNode }) => children,
   TooltipTrigger: ({ render }: { render: ReactNode }) => render,

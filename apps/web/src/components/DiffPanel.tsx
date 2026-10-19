@@ -10,14 +10,17 @@ import type { ScopedThreadRef, RunId } from "@t3tools/contracts";
 import {
   ArrowRightIcon,
   CheckIcon,
+  ChevronDown,
   ChevronDownIcon,
+  ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
   Columns2Icon,
   FolderTreeIcon,
   PilcrowIcon,
   Rows3Icon,
   TextWrapIcon,
-} from "lucide-react";
-import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown } from "lucide";
+} from "~/components/appIcons";
 import * as Schema from "effect/Schema";
 import * as DateTime from "effect/DateTime";
 import { useEffect, useRef, useState } from "react";
@@ -55,7 +58,7 @@ import { AnnotatableCodeView, type AnnotatableCodeViewHandle } from "./diffs/Ann
 import { DiffFileTree } from "./diffs/DiffFileTree";
 import { diffFileTreeEntries } from "./diffs/diffFileTree.logic";
 import { Button } from "./ui/button";
-import { MorphIcon } from "~/components/MorphIcon";
+import { SwapIcon } from "~/components/SwapIcon";
 import { ToggleGroup, Toggle } from "./ui/toggle-group";
 import { Switch } from "./ui/switch";
 import {
@@ -151,7 +154,7 @@ function DiffFileCollapseToggle({
           />
         }
       >
-        <MorphIcon
+        <SwapIcon
           className={cn("size-4", iconClassName)}
           icon={collapsed ? ChevronRight : ChevronDown}
         />
@@ -868,7 +871,7 @@ export default function DiffPanel({
                 />
               }
             >
-              <MorphIcon
+              <SwapIcon
                 className="size-3.5"
                 icon={allDiffFilesCollapsed ? ChevronsUpDown : ChevronsDownUp}
               />

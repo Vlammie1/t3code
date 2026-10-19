@@ -7,7 +7,7 @@ import {
   type HtmlRenderOutlineBox,
   type HtmlRenderReference,
 } from "@t3tools/shared/htmlRender";
-import { Maximize2Icon } from "lucide-react";
+import { Maximize2Icon } from "~/components/appIcons";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { useAssetUrlRefresh, useAssetUrlState } from "~/assets/assetUrls";

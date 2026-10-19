@@ -1,5 +1,5 @@
 import type { DevicePlatformAvailability } from "@t3tools/contracts";
-import { Check, Minus } from "lucide-react";
+import { Check, Minus } from "~/components/appIcons";
 import { Tooltip, TooltipTrigger, TooltipPopup } from "../ui/tooltip";
 
 export function DeviceHostAvailability({

@@ -1056,7 +1056,7 @@ import {
   PlayIcon,
   ShieldIcon,
   XIcon,
-} from "lucide-react";
+} from "~/components/appIcons";
 import { proposedPlanTitle } from "@t3tools/shared/proposedPlanText";
 import { hasProviderSetup } from "./ProviderStatusBanner";
 import {

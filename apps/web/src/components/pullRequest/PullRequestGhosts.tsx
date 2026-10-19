@@ -8,7 +8,7 @@ import {
   TagIcon,
   UserPlusIcon,
   UsersIcon,
-} from "lucide-react";
+} from "~/components/appIcons";
 import type { ReactNode } from "react";
 
 import { readLocalApi } from "~/localApi";

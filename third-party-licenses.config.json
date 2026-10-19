@@ -182,6 +182,15 @@
     },
     {
       "license": "MIT",
+      "name": "@fluentui/react-icons",
+      "sourceUrl": "https://github.com/microsoft/fluentui-system-icons",
+      "generatedNotice": {
+        "licenseId": "MIT",
+        "copyrights": ["Copyright (c) 2020 Microsoft Corporation"]
+      }
+    },
+    {
+      "license": "MIT",
       "name": "@react-grab/cli",
       "sourceUrl": "https://github.com/aidenybai/react-grab/tree/main/packages/cli",
       "generatedNotice": {

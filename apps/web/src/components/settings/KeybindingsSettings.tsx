@@ -10,7 +10,7 @@ import {
   SearchIcon,
   TriangleAlertIcon,
   XIcon,
-} from "lucide-react";
+} from "~/components/appIcons";
 import { useLocation } from "@tanstack/react-router";
 import {
   type KeyboardEvent,

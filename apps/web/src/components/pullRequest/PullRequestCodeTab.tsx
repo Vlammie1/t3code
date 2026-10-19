@@ -11,8 +11,12 @@ import type {
   PullRequestThreadCommentsResult,
 } from "@t3tools/contracts";
 import {
+  ChevronDown,
   ChevronDownIcon,
+  ChevronRight,
   ChevronRightIcon,
+  ChevronsDownUp,
+  ChevronsUpDown,
   Columns2Icon,
   FolderTreeIcon,
   InfoIcon,
@@ -22,8 +26,7 @@ import {
   Settings2Icon,
   TextWrapIcon,
   TriangleAlertIcon,
-} from "lucide-react";
-import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown } from "lucide";
+} from "~/components/appIcons";
 import { useAtomRefresh } from "@effect/atom-react";
 import * as Schema from "effect/Schema";
 import {
@@ -73,7 +76,7 @@ import { useCodeViewFileReveal } from "../diffs/useCodeViewFileReveal";
 import { diffFileTreeEntries } from "../diffs/diffFileTree.logic";
 import { StyledDiffCodeView } from "../diffs/StyledDiffCodeView";
 import { Button } from "../ui/button";
-import { MorphIcon } from "~/components/MorphIcon";
+import { SwapIcon } from "~/components/SwapIcon";
 import { Checkbox } from "../ui/checkbox";
 import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "../ui/collapsible";
 import {
@@ -784,7 +787,7 @@ function PullRequestCodeTab({
           toggleFile(item.id);
         }}
       >
-        <MorphIcon className="size-4" icon={collapsed ? ChevronRight : ChevronDown} />
+        <SwapIcon className="size-4" icon={collapsed ? ChevronRight : ChevronDown} />
       </Button>
     );
   };
@@ -1227,7 +1230,7 @@ function PullRequestCodeTab({
                 />
               }
             >
-              <MorphIcon
+              <SwapIcon
                 className="size-3.5"
                 icon={allFilesCollapsed ? ChevronsUpDown : ChevronsDownUp}
               />

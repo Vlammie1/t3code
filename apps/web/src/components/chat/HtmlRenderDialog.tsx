@@ -1,5 +1,5 @@
 import type { ScopedThreadRef } from "@t3tools/contracts";
-import { MinusIcon, PlusIcon, XIcon } from "lucide-react";
+import { MinusIcon, PlusIcon, XIcon } from "~/components/appIcons";
 import { useRef, useState } from "react";
 
 import { HtmlRenderDocument } from "../files/BrowserDocumentFrame";

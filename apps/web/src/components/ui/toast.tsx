@@ -12,12 +12,21 @@ import {
   type ReactNode,
 } from "react";
 import { type ScopedThreadRef, type ThreadId } from "@t3tools/contracts";
-import { CircleAlertIcon, CircleCheckIcon, InfoIcon, TriangleAlertIcon, XIcon } from "lucide-react";
-import { Check, ChevronDown, ChevronUp, Copy } from "lucide";
+import {
+  Check,
+  ChevronDown,
+  ChevronUp,
+  CircleAlertIcon,
+  CircleCheckIcon,
+  Copy,
+  InfoIcon,
+  TriangleAlertIcon,
+  XIcon,
+} from "~/components/appIcons";
 
 import { cn } from "~/lib/utils";
 import { Button, buttonVariants } from "~/components/ui/button";
-import { MorphIcon } from "~/components/MorphIcon";
+import { SwapIcon } from "~/components/SwapIcon";
 import { useComposerDraftStore } from "~/composerDraftStore";
 import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
 import {
@@ -121,7 +130,7 @@ function CopyErrorButton({ text }: { text: string }) {
           />
         }
       >
-        <MorphIcon
+        <SwapIcon
           className={cn("size-3", isCopied && "text-success")}
           icon={isCopied ? Check : Copy}
         />
@@ -153,11 +162,7 @@ function ToastExpandableSection({
         onClick={() => setOpen((prev) => !prev)}
         type="button"
       >
-        <MorphIcon
-          className="size-3.5 shrink-0 opacity-80"
-          icon={open ? ChevronUp : ChevronDown}
-          strokeWidth={2.25}
-        />
+        <SwapIcon className="size-3.5 shrink-0 opacity-80" icon={open ? ChevronUp : ChevronDown} />
         {open ? collapseLabel : expandLabel}
       </button>
       {open ? <div className={toastExpandablePanelClassName}>{children}</div> : null}
@@ -237,11 +242,10 @@ function ToastDescriptionAndExpandable({
               data-slot="toast-description"
             />
           </div>
-          <MorphIcon
+          <SwapIcon
             aria-hidden
             className="mt-0.5 size-3.5 shrink-0 text-muted-foreground opacity-80"
             icon={open ? ChevronUp : ChevronDown}
-            strokeWidth={2.25}
           />
         </TooltipTrigger>
         <TooltipPopup side="top">{open ? collapseLabel : expandLabel}</TooltipPopup>
@@ -633,7 +637,7 @@ function Toasts({ position }: { position: ToastPosition }) {
                   }
                   type="button"
                 >
-                  <XIcon className="size-3" strokeWidth={2.25} />
+                  <XIcon className="size-3" />
                 </button>
               </div>
               <Toast.Content
@@ -728,7 +732,7 @@ function AnchoredToasts() {
                           }
                           type="button"
                         >
-                          <XIcon className="size-3" strokeWidth={2.25} />
+                          <XIcon className="size-3" />
                         </button>
                       </div>
                       <Toast.Content

@@ -11,7 +11,7 @@ import type {
   ProviderInstanceId,
   ServerProvider,
 } from "@t3tools/contracts";
-import { ChevronRightIcon, WorkflowIcon } from "lucide-react";
+import { ChevronRightIcon, WorkflowIcon } from "~/components/appIcons";
 import { useState } from "react";
 
 import { cn } from "../../lib/utils";

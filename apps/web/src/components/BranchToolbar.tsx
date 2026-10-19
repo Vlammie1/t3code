@@ -10,7 +10,7 @@ import {
   FolderGitIcon,
   FolderIcon,
   ScaleIcon,
-} from "lucide-react";
+} from "~/components/appIcons";
 import {
   type Ref,
   type MouseEvent as ReactMouseEvent,

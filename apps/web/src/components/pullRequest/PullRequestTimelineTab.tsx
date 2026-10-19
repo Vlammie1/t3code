@@ -13,7 +13,7 @@ import {
   FileCode2Icon,
   GitCommitHorizontalIcon,
   MessageSquareIcon,
-} from "lucide-react";
+} from "~/components/appIcons";
 import { useState, type ReactNode } from "react";
 
 import { cn } from "~/lib/utils";

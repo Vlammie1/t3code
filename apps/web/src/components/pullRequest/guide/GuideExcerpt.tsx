@@ -6,7 +6,7 @@ import type {
 } from "@pierre/diffs";
 import { FileDiff } from "@pierre/diffs/react";
 import type { PullRequestReviewGuideExcerpt, PullRequestReviewPosition } from "@t3tools/contracts";
-import { ArrowUpRightIcon } from "lucide-react";
+import { ArrowUpRightIcon } from "~/components/appIcons";
 import { useState } from "react";
 
 import { useTheme } from "~/hooks/useTheme";

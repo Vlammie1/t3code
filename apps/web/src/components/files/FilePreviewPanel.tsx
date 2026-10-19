@@ -37,8 +37,7 @@ import {
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
 import { mediaFileReference } from "@t3tools/client-runtime/media-reference";
-import { FolderTree, Globe2, WrapTextIcon } from "lucide-react";
-import { Code2, Eye, Table2 } from "lucide";
+import { Code2, Eye, FolderTree, Globe2, Table2, WrapTextIcon } from "~/components/appIcons";
 import * as Schema from "effect/Schema";
 import { useEffect, useRef, useState } from "react";
 
@@ -47,7 +46,7 @@ import { useAssetUrlRefresh, useAssetUrlState } from "~/assets/assetUrls";
 import { OpenInPicker } from "~/components/chat/OpenInPicker";
 import { MediaVideoPlayer } from "~/components/media/MediaVideoPlayer";
 import { MediaActions, type MediaActionSource } from "~/components/media/MediaActions";
-import { MorphIcon } from "~/components/MorphIcon";
+import { SwapIcon } from "~/components/SwapIcon";
 import { useRemoteOpenState } from "~/remoteOpen";
 import { useClientSettings, updateClientSettings } from "~/hooks/useSettings";
 import { useTheme } from "~/hooks/useTheme";
@@ -1245,7 +1244,7 @@ export default function FilePreviewPanel({
                 );
               }}
             >
-              <MorphIcon
+              <SwapIcon
                 className="size-3.5"
                 icon={rendered ? Code2 : renderedMode === "table" ? Table2 : Eye}
               />

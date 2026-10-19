@@ -5,7 +5,7 @@ import type {
   DeviceSummary,
   ScopedThreadRef,
 } from "@t3tools/contracts";
-import { Smartphone, X } from "lucide-react";
+import { Smartphone, X } from "~/components/appIcons";
 import { useEffect, useState } from "react";
 
 import { usePreviewMiniPlayerStore } from "~/previewMiniPlayerStore";

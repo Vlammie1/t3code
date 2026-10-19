@@ -31,15 +31,15 @@ import {
 } from "@t3tools/contracts";
 import type { TimestampFormat } from "@t3tools/contracts/settings";
 import {
+  ArrowRightIcon,
+  ArrowRightLeftIcon,
   BotIcon,
   ChevronRightIcon,
-  ArrowRightLeftIcon,
-  ArrowRightIcon,
   GitForkIcon,
   MessageSquareIcon,
   MinusIcon,
   XIcon,
-} from "lucide-react";
+} from "~/components/appIcons";
 
 import { Tooltip, TooltipTrigger, TooltipPopup } from "../ui/tooltip";
 import { getProviderInstanceEntry } from "../../providerInstances";

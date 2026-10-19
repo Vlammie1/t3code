@@ -23,7 +23,7 @@ import {
   MoreVertical,
   PlusIcon,
   TriangleAlertIcon,
-} from "lucide-react";
+} from "~/components/appIcons";
 import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "../ui/collapsible";
 import { Menu, MenuTrigger, MenuPopup, MenuItem } from "../ui/menu";
 import { SettingsRow } from "./settingsLayout";

@@ -25,7 +25,7 @@ const RESTRICTED_UI_VARIANT_PATTERNS = [
 ];
 
 const RESTRICTED_PULL_REQUEST_GLYPH_IMPORTS = {
-  name: "lucide-react",
+  name: "~/components/appIcons",
   importNames: [
     "GitMerge",
     "GitMergeIcon",

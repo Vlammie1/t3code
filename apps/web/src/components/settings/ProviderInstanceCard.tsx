@@ -4,17 +4,18 @@ import { Spinner } from "~/components/ui/spinner";
 
 import {
   AlertTriangleIcon,
-  CheckIcon,
   ArrowUpCircleIcon,
+  CheckIcon,
   CopyIcon,
   DownloadIcon,
   ExternalLinkIcon,
   LayersIcon,
+  Lock as LockGlyph,
+  LockOpen,
   PlusIcon,
   Trash2Icon,
   XIcon,
-} from "lucide-react";
-import { Lock as LockGlyph, LockOpen } from "lucide";
+} from "~/components/appIcons";
 import * as Arr from "effect/Array";
 import * as Result from "effect/Result";
 import { useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
@@ -43,7 +44,7 @@ import { useStableCallback } from "../../hooks/useStableCallback";
 import { normalizeProviderAccentColor } from "../../providerInstances";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
-import { MorphIcon } from "~/components/MorphIcon";
+import { SwapIcon } from "~/components/SwapIcon";
 import { DraftInput } from "../ui/draft-input";
 import { SecretInput } from "./SecretInput";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
@@ -455,7 +456,7 @@ export function ProviderEnvironmentSection(props: {
                       aria-pressed={variable.sensitive}
                       aria-label={`Mark environment variable ${variable.name || index + 1} as sensitive`}
                     >
-                      <MorphIcon
+                      <SwapIcon
                         className="size-3"
                         icon={variable.sensitive ? LockGlyph : LockOpen}
                       />

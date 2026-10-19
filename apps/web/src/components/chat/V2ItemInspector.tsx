@@ -13,7 +13,7 @@ import {
 } from "@t3tools/client-runtime/work-log/item-detail";
 import { formatDiffCount } from "@t3tools/client-runtime/diff-count";
 import { isJavaScriptReplTool } from "@t3tools/shared/toolActivity";
-import { ExternalLinkIcon, GitBranchIcon, PlayIcon, RotateCcwIcon } from "lucide-react";
+import { ExternalLinkIcon, GitBranchIcon, PlayIcon, RotateCcwIcon } from "~/components/appIcons";
 import { memo, type ReactNode, Suspense, use } from "react";
 
 import { useTheme } from "../../hooks/useTheme";

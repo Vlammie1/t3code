@@ -1,5 +1,5 @@
 import { useAuth, useClerk } from "@clerk/react";
-import { ServerIcon, SmartphoneIcon } from "lucide-react";
+import { ServerIcon, SmartphoneIcon } from "~/components/appIcons";
 import { type ReactNode, useState } from "react";
 import { createPortal } from "react-dom";
 

@@ -5,7 +5,7 @@ import {
   formatContextWindowCompactionMessage,
   formatContextWindowCost,
 } from "./ContextWindowMeter.logic";
-import { Minimize2Icon } from "lucide-react";
+import { Minimize2Icon } from "~/components/appIcons";
 import { composerFloatingLayerProps } from "./composerEventScope";
 
 function formatPercentage(value: number | null): string | null {

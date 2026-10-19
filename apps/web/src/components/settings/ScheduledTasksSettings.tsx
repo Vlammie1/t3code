@@ -11,7 +11,7 @@ import {
   PlayIcon,
   PlusIcon,
   Trash2Icon,
-} from "lucide-react";
+} from "~/components/appIcons";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import type {
   EnvironmentId,

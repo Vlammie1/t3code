@@ -6,15 +6,21 @@ import {
   summarizeTurnDiffStats,
   type TurnDiffTreeNode,
 } from "../../lib/turnDiffTree";
-import { ChevronRightIcon, FileDiffIcon } from "lucide-react";
-import { ChevronsDownUp, ChevronsUpDown, Folder, FolderClosed } from "lucide";
+import {
+  ChevronRightIcon,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  FileDiffIcon,
+  FolderIcon,
+  FolderOpenIcon,
+} from "~/components/appIcons";
 import { cn } from "~/lib/utils";
 import { DiffStatLabel, hasNonZeroStat } from "./DiffStatLabel";
 import { PierreEntryIcon } from "./PierreEntryIcon";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { MiddleTruncate } from "../ui/middle-truncate";
-import { MorphIcon } from "~/components/MorphIcon";
+import { SwapIcon } from "~/components/SwapIcon";
 
 const EMPTY_DIRECTORY_OVERRIDES: Record<string, boolean> = {};
 
@@ -80,7 +86,7 @@ export const ChangedFilesCard = memo(function ChangedFilesCard(props: {
                   />
                 }
               >
-                <MorphIcon
+                <SwapIcon
                   className="size-3"
                   icon={allDirectoriesExpanded ? ChevronsDownUp : ChevronsUpDown}
                 />
@@ -182,9 +188,9 @@ export const ChangedFilesTree = memo(function ChangedFilesTree(props: {
                 isExpanded && "rotate-90",
               )}
             />
-            <MorphIcon
+            <SwapIcon
               className="size-3.5 shrink-0 text-muted-foreground/75"
-              icon={isExpanded ? Folder : FolderClosed}
+              icon={isExpanded ? FolderOpenIcon : FolderIcon}
             />
             <span className="truncate font-mono text-2xs text-muted-foreground/90 group-hover:text-foreground/90">
               {node.name}

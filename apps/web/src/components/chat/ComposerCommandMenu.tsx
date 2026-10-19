@@ -12,14 +12,14 @@ import {
   type ServerProviderSlashCommand,
 } from "@t3tools/contracts";
 import {
+  type AppIcon,
   BlocksIcon,
   FolderIcon,
   MessagesSquareIcon,
   PackageIcon,
   SettingsIcon,
   UserRoundIcon,
-  type LucideIcon,
-} from "lucide-react";
+} from "~/components/appIcons";
 import { memo, useLayoutEffect, useRef } from "react";
 
 import { type ComposerSlashCommand, type ComposerTriggerKind } from "../../composer-logic";
@@ -244,7 +244,7 @@ const LISTBOX_LABEL_BY_TRIGGER: Record<ComposerTriggerKind, string> = {
   skill: "Skills",
 };
 
-const SKILL_SOURCE_ICON_BY_KIND: Record<ProviderSkillSourceKind, LucideIcon> = {
+const SKILL_SOURCE_ICON_BY_KIND: Record<ProviderSkillSourceKind, AppIcon> = {
   app: BlocksIcon,
   repo: FolderIcon,
   project: FolderIcon,

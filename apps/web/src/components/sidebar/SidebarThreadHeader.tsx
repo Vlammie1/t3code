@@ -1,4 +1,4 @@
-import { FolderPlusIcon, SearchIcon, SquarePenIcon, XIcon } from "lucide-react";
+import { FolderPlusIcon, SearchIcon, SquarePenIcon, XIcon } from "~/components/appIcons";
 import {
   type ComponentProps,
   type KeyboardEvent as ReactKeyboardEvent,

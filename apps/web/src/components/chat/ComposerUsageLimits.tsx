@@ -1,6 +1,6 @@
 import type { EnvironmentId, UsageLimitsReport } from "@t3tools/contracts";
 import { limitsNotice } from "@t3tools/shared/usageLimits";
-import { GaugeIcon } from "lucide-react";
+import { GaugeIcon } from "~/components/appIcons";
 
 import { ensureLocalApi } from "../../localApi";
 import { Button } from "../ui/button";

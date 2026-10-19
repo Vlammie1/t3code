@@ -25,8 +25,11 @@ import {
   encodeComposerContextClipboardHtml,
 } from "@t3tools/shared/composerContextClipboard";
 import {
+  type AppIcon,
+  Check,
   ChevronRightIcon,
   CodeIcon,
+  Copy,
   FileSpreadsheetIcon,
   FileTextIcon,
   GlobeIcon,
@@ -34,8 +37,10 @@ import {
   InfoIcon,
   LightbulbIcon,
   MailIcon,
+  Maximize2,
   MessageSquareIcon,
   MessageSquareWarningIcon,
+  Minimize2,
   OctagonAlertIcon,
   PlayIcon,
   PresentationIcon,
@@ -43,9 +48,7 @@ import {
   TriangleAlertIcon,
   WorkflowIcon,
   WrapTextIcon,
-  type LucideIcon,
-} from "lucide-react";
-import { Check, Copy, Maximize2, Minimize2 } from "lucide";
+} from "~/components/appIcons";
 import {
   AuthPreviewOperateScope,
   type AssetResource,
@@ -137,7 +140,7 @@ import {
 import { hasSpecificPierreIconForFileName, syntheticFileNameForLanguageId } from "../pierre-icons";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 import { Button } from "./ui/button";
-import { MorphIcon } from "~/components/MorphIcon";
+import { SwapIcon } from "~/components/SwapIcon";
 import { ContextChip } from "./ContextChip";
 import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "./ui/collapsible";
 import { ScrollArea } from "./ui/scroll-area";
@@ -299,7 +302,7 @@ const ARTIFACT_TEMPLATE_ICON_BY_KIND = {
   image: ImageIcon,
   email: MailIcon,
   slack: MessageSquareIcon,
-} satisfies Record<CodexArtifactTemplateKind, LucideIcon>;
+} satisfies Record<CodexArtifactTemplateKind, AppIcon>;
 
 function CodexArtifactTemplateCard(props: {
   readonly template: CodexArtifactTemplate;
@@ -675,7 +678,7 @@ function MarkdownTable({ children, ...props }: React.ComponentProps<"table">) {
                 />
               }
             >
-              <MorphIcon className="size-3" icon={expanded ? Minimize2 : Maximize2} />
+              <SwapIcon className="size-3" icon={expanded ? Minimize2 : Maximize2} />
             </TooltipTrigger>
             <TooltipPopup side="top">{expandLabel}</TooltipPopup>
           </Tooltip>
@@ -698,7 +701,7 @@ function MarkdownTable({ children, ...props }: React.ComponentProps<"table">) {
                 />
               }
             >
-              <MorphIcon className="size-3" icon={copied ? Check : Copy} />
+              <SwapIcon className="size-3" icon={copied ? Check : Copy} />
             </TooltipTrigger>
             <TooltipPopup side="top">{copyLabel}</TooltipPopup>
           </Tooltip>
@@ -946,7 +949,7 @@ function MarkdownCodeBlock({
           />
         }
       >
-        <MorphIcon className="size-3" icon={copied ? Check : Copy} />
+        <SwapIcon className="size-3" icon={copied ? Check : Copy} />
       </TooltipTrigger>
       <TooltipPopup side="top">{copyLabel}</TooltipPopup>
     </Tooltip>

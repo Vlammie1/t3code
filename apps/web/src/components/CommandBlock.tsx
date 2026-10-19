@@ -1,6 +1,6 @@
-import { Check, Copy } from "lucide";
+import { Check, Copy } from "~/components/appIcons";
 
-import { MorphIcon } from "~/components/MorphIcon";
+import { SwapIcon } from "~/components/SwapIcon";
 import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
 import { cn } from "~/lib/utils";
 
@@ -37,7 +37,7 @@ export function CommandBlock({
         aria-label="Copy command"
         onClick={() => copyToClipboard(command, undefined)}
       >
-        <MorphIcon className="size-3.5" icon={isCopied ? Check : Copy} />
+        <SwapIcon className="size-3.5" icon={isCopied ? Check : Copy} />
       </Button>
     </div>
   );

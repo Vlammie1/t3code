@@ -69,6 +69,7 @@ import type { TimestampFormat } from "@t3tools/contracts/settings";
 import {
   AlarmClockIcon,
   AlarmClockOffIcon,
+  type AppIcon,
   ArrowRightLeftIcon,
   CheckIcon,
   CircleAlertIcon,
@@ -89,8 +90,7 @@ import {
   TerminalIcon,
   Undo2Icon,
   XIcon,
-  type LucideIcon,
-} from "lucide-react";
+} from "~/components/appIcons";
 import {
   memo,
   useEffect,
@@ -1404,7 +1404,7 @@ function SidebarSectionHeader(props: {
 
 const STATUS_GROUP_ICON: Record<
   SidebarStatusGroup,
-  { readonly Icon: LucideIcon; readonly className: string }
+  { readonly Icon: AppIcon; readonly className: string }
 > = {
   active: { Icon: CircleDashedIcon, className: "text-info" },
   attention: { Icon: MessageCircleQuestionIcon, className: "text-warning" },

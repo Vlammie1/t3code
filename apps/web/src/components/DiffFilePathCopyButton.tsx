@@ -1,4 +1,4 @@
-import { Check, Copy } from "lucide";
+import { Check, Copy } from "~/components/appIcons";
 import { useRef } from "react";
 import { useCopyToClipboard } from "../hooks/useCopyToClipboard";
 import { cn } from "../lib/utils";
@@ -8,7 +8,7 @@ import {
   showAnchoredCopySuccessToast,
 } from "./ui/anchoredCopyToast";
 import { Button } from "./ui/button";
-import { MorphIcon } from "~/components/MorphIcon";
+import { SwapIcon } from "~/components/SwapIcon";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 
 export function DiffFilePathCopyButton({ filePath }: { filePath: string }) {
@@ -32,7 +32,7 @@ export function DiffFilePathCopyButton({ filePath }: { filePath: string }) {
           />
         }
       >
-        <MorphIcon
+        <SwapIcon
           className={cn("size-3", isCopied && "text-success")}
           icon={isCopied ? Check : Copy}
         />

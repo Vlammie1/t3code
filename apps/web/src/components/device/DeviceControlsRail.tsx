@@ -1,11 +1,12 @@
 import type { DevicePlatform } from "@t3tools/contracts";
 import {
+  Box,
   Camera,
   ChevronLeft,
   Home,
   Keyboard,
-  Box,
   Maximize,
+  Moon,
   MoreHorizontal,
   PictureInPicture2,
   Power,
@@ -13,13 +14,13 @@ import {
   SlidersHorizontal,
   Smartphone,
   Square,
+  Sun,
   Type,
   X,
-} from "lucide-react";
-import { Moon, Sun } from "lucide";
+} from "~/components/appIcons";
 import type { ReactNode } from "react";
 import { Button } from "~/components/ui/button";
-import { MorphIcon } from "~/components/MorphIcon";
+import { SwapIcon } from "~/components/SwapIcon";
 import {
   Menu,
   MenuItem,
@@ -131,7 +132,7 @@ export function DeviceControlsRail(props: {
           disabled={controls.disabled || !settings?.appearance}
           onClick={() => void controls.act({ type: "setAppearance", value: nextAppearance })}
         >
-          <MorphIcon icon={settings?.appearance === "dark" ? Sun : Moon} />
+          <SwapIcon icon={settings?.appearance === "dark" ? Sun : Moon} />
         </RailButton>
         <Menu>
           <MenuTrigger

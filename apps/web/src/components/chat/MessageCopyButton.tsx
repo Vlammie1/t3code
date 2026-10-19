@@ -1,7 +1,7 @@
 import { memo, useRef } from "react";
-import { Check, Copy } from "lucide";
+import { Check, Copy } from "~/components/appIcons";
 import { Button } from "../ui/button";
-import { MorphIcon } from "~/components/MorphIcon";
+import { SwapIcon } from "~/components/SwapIcon";
 import { cn } from "~/lib/utils";
 import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
 import {
@@ -52,7 +52,7 @@ export const MessageCopyButton = memo(function MessageCopyButton({
           />
         }
       >
-        <MorphIcon
+        <SwapIcon
           className={cn("size-3", isCopied && "text-primary")}
           icon={isCopied ? Check : icon}
         />

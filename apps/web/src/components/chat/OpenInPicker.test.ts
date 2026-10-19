@@ -1,4 +1,4 @@
-import { FolderClosedIcon } from "lucide-react";
+import { FolderClosedIcon } from "~/components/appIcons";
 import { FileExplorerIcon, FinderIcon } from "../Icons";
 import { resolveOpenInOptions } from "./OpenInPicker";
 import { EnvironmentId } from "@t3tools/contracts";

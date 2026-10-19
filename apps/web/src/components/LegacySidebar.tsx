@@ -10,7 +10,7 @@ import {
   SearchIcon,
   SquarePenIcon,
   TriangleAlertIcon,
-} from "lucide-react";
+} from "~/components/appIcons";
 import {
   ChangeRequestStatusIcon,
   prStatusIndicator,

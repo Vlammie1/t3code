@@ -24,7 +24,7 @@ import {
   connectionRoutes,
   isLearned,
 } from "@t3tools/client-runtime/connection";
-import { GripVerticalIcon, PlusIcon, XIcon } from "lucide-react";
+import { GripVerticalIcon, PlusIcon, XIcon } from "~/components/appIcons";
 import { useState } from "react";
 
 import { requestConfirmDialog } from "~/confirmDialog";

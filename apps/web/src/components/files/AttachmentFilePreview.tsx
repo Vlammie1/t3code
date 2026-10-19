@@ -6,13 +6,23 @@ import { settlePromise } from "@t3tools/client-runtime/state/runtime";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import * as Cause from "effect/Cause";
 import { filePreviewKind, FILE_TEXT_PREVIEW_MAX_BYTES } from "@t3tools/shared/filePreview";
-import { ChevronRightIcon, DownloadIcon, Trash2Icon, WrapTextIcon, XIcon } from "lucide-react";
-import { Check, Code2, Copy, Eye, Table2 } from "lucide";
+import {
+  Check,
+  ChevronRightIcon,
+  Code2,
+  Copy,
+  DownloadIcon,
+  Eye,
+  Table2,
+  Trash2Icon,
+  WrapTextIcon,
+  XIcon,
+} from "~/components/appIcons";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 
 import { useAssetUrlRefresh } from "~/assets/assetUrls";
 import ChatMarkdown from "~/components/ChatMarkdown";
-import { MorphIcon } from "~/components/MorphIcon";
+import { SwapIcon } from "~/components/SwapIcon";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { toastManager } from "~/components/ui/toast";
 import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
@@ -283,7 +293,7 @@ export function AttachmentFilePreview(props: {
             pressed={rendered}
             onPress={() => setRendered((value) => !value)}
           >
-            <MorphIcon
+            <SwapIcon
               className="size-3.5"
               icon={rendered ? Code2 : renderedMode === "table" ? Table2 : Eye}
             />
@@ -303,7 +313,7 @@ export function AttachmentFilePreview(props: {
             label={isCopied ? "Copied" : content.truncated ? "Copy preview" : "Copy contents"}
             onPress={() => copyToClipboard(content.text, undefined)}
           >
-            <MorphIcon className="size-3.5" icon={isCopied ? Check : Copy} />
+            <SwapIcon className="size-3.5" icon={isCopied ? Check : Copy} />
           </FileSurfaceAction>
         ) : null}
         {url ? (

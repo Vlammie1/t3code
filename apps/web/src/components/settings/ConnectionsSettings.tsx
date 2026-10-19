@@ -8,7 +8,7 @@ import {
   QrCodeIcon,
   RouteIcon,
   TerminalIcon,
-} from "lucide-react";
+} from "~/components/appIcons";
 import { useAtomValue } from "@effect/atom-react";
 import {
   type KeyboardEvent,

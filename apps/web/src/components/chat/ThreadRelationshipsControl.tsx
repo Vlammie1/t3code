@@ -47,7 +47,7 @@ import {
   PlusIcon,
   SquareIcon,
   UnplugIcon,
-} from "lucide-react";
+} from "~/components/appIcons";
 import { useState, type ReactNode } from "react";
 
 import { useArchivedThreadSnapshots } from "../../lib/archivedThreadsState";

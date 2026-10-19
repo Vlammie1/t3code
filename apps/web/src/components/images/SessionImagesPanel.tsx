@@ -1,5 +1,5 @@
 import type { EnvironmentId } from "@t3tools/contracts";
-import { ChevronLeftIcon, ChevronRightIcon, ImagesIcon } from "lucide-react";
+import { ChevronLeftIcon, ChevronRightIcon, ImagesIcon } from "~/components/appIcons";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 
 import { useAssetUrlState } from "../../assets/assetUrls";

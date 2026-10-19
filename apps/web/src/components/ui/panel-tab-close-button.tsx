@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { X } from "~/components/appIcons";
 import type { ReactNode } from "react";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 

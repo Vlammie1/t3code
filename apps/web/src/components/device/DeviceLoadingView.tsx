@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Smartphone } from "lucide-react";
+import { Smartphone } from "~/components/appIcons";
 
 import { Spinner } from "~/components/ui/spinner";
 

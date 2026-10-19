@@ -12,7 +12,7 @@ import {
   CircleCheckIcon,
   MessageCircleQuestionIcon,
   ShieldQuestionIcon,
-} from "lucide-react";
+} from "~/components/appIcons";
 import { useEffect, useRef } from "react";
 
 import { getClientSettings, useClientSettings } from "../hooks/useSettings";

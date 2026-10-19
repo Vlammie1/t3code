@@ -1,4 +1,4 @@
-import { MessageSquareDashedIcon, PlusIcon } from "lucide-react";
+import { MessageSquareDashedIcon, PlusIcon } from "~/components/appIcons";
 
 import { openCommandPalette } from "../commandPaletteBus";
 import { isElectron } from "../env";
