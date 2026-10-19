@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { claudeRateLimitEventToUpdate, claudeUsageResponseToLimits } from "./claudeUsageLimits.ts";
+import {
+  claudeOAuthUsageToUpdate,
+  claudeRateLimitEventToUpdate,
+  claudeUsageResponseToLimits,
+} from "./claudeUsageLimits.ts";
 
 const checkedAt = "2026-07-18T10:00:00.000Z";
 const noNames = { overageIncluded: undefined } as const;
@@ -175,5 +179,40 @@ describe("claudeRateLimitEventToUpdate", () => {
     expect(
       claudeRateLimitEventToUpdate({ status: "rejected", rateLimitType: "five_hour" }, noNames),
     ).toBeUndefined();
+  });
+});
+
+describe("claudeOAuthUsageToUpdate", () => {
+  it("reads the session and weekly windows as percentages", () => {
+    expect(
+      claudeOAuthUsageToUpdate({
+        five_hour: { utilization: 12, resets_at: "2026-10-19T15:00:00Z" },
+        seven_day: { utilization: 39.5, resets_at: null },
+        seven_day_opus: { utilization: 80 },
+      }),
+    ).toEqual({
+      windows: [
+        {
+          id: "five_hour",
+          kind: "session",
+          label: "Session",
+          windowDurationMins: 300,
+          usedPercent: 12,
+          resetsAt: "2026-10-19T15:00:00.000Z",
+        },
+        {
+          id: "seven_day",
+          kind: "weekly",
+          label: "Weekly",
+          windowDurationMins: 10080,
+          usedPercent: 39.5,
+        },
+      ],
+    });
+  });
+
+  it("returns nothing for an answer without windows", () => {
+    expect(claudeOAuthUsageToUpdate({ five_hour: null })).toBeUndefined();
+    expect(claudeOAuthUsageToUpdate("nope")).toBeUndefined();
   });
 });

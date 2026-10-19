@@ -1,5 +1,6 @@
 import { ClaudeSettings, ProviderDriverKind } from "@t3tools/contracts";
 import * as Cache from "effect/Cache";
+import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
@@ -7,6 +8,7 @@ import * as Exit from "effect/Exit";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Ref from "effect/Ref";
+import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
 import { HttpClient } from "effect/http";
 import { ChildProcessSpawner } from "effect/process";
@@ -65,6 +67,7 @@ const decodeClaudeSettings = Schema.decodeSync(ClaudeSettings);
 
 const DRIVER_KIND = ProviderDriverKind.make("claudeAgent");
 const CAPABILITIES_PROBE_TTL = Duration.minutes(5);
+const USAGE_WINDOW_REFRESH = Duration.minutes(1);
 
 const withoutUsage = (capabilities: ClaudeCapabilitiesProbe): ClaudeCapabilitiesProbe => {
   const result = { ...capabilities };
@@ -310,6 +313,31 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
               cause,
             }),
         ),
+      );
+
+      // The full check above spawns Claude, so it runs every few minutes. The
+      // session and weekly windows refresh each minute over the HTTP endpoint
+      // `/usage` reads, which keeps the composer's limit bars current.
+      const host = yield* ProviderHost.ProviderHost;
+      yield* Effect.gen(function* () {
+        const current = yield* snapshot.getSnapshot;
+        if (!current.enabled || !current.version || !current.usageLimits) return;
+        if (current.usageLimits.unavailable) return;
+        if (!(yield* host.shouldRunBackgroundWork({ type: "provider-status", instanceId }))) return;
+        const update = yield* ClaudeResetCredits.readClaudeUsageWindows(configDir, current.version);
+        if (update) {
+          yield* snapshot.applyUsageLimits({
+            ...update,
+            checkedAt: DateTime.formatIso(yield* DateTime.now),
+          });
+        }
+      }).pipe(
+        Effect.provideService(HttpClient.HttpClient, httpClient),
+        Effect.provideService(FileSystem.FileSystem, fileSystem),
+        Effect.provideService(Path.Path, path),
+        Effect.ignoreCause({ log: true }),
+        Effect.repeat(Schedule.spaced(USAGE_WINDOW_REFRESH)),
+        Effect.forkScoped,
       );
 
       // Same rules as Codex: serialised on the config directory that holds the

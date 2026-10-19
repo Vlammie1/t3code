@@ -11,6 +11,8 @@ import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
 
+import { claudeOAuthUsageToUpdate } from "./claudeUsageLimits.ts";
+
 const API_BASE = "https://api.anthropic.com";
 const PROGRAM = "cedar_ember";
 const GRANT_ID = /^[a-z0-9_-]{1,40}$/;
@@ -166,6 +168,26 @@ export const readClaudeResetCredits = Effect.fn("readClaudeResetCredits")(
       body.cedar_ember,
       DateTime.toEpochMillis(yield* DateTime.now),
     );
+  },
+  Effect.timeout("10 seconds"),
+  Effect.orElseSucceed(() => undefined),
+);
+
+/** Fails quietly: a missed minute leaves the last windows in place. */
+export const readClaudeUsageWindows = Effect.fn("readClaudeUsageWindows")(
+  function* (configDir: string, version: string) {
+    const token = yield* readAccessToken(configDir);
+    if (!token) return undefined;
+    const client = yield* HttpClient.HttpClient;
+    const response = yield* client.execute(
+      HttpClientRequest.get(`${API_BASE}/api/oauth/usage`, {
+        urlParams: { skip_spend: "1" },
+      }).pipe(withClaudeHeaders(token, version)),
+    );
+    const body = yield* HttpClientResponse.filterStatusOk(response).pipe(
+      Effect.flatMap((ok) => ok.json),
+    );
+    return claudeOAuthUsageToUpdate(body);
   },
   Effect.timeout("10 seconds"),
   Effect.orElseSucceed(() => undefined),

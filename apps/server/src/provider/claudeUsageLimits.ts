@@ -175,3 +175,30 @@ export const recordClaudeUsageResponse = (
   const { limits, names } = claudeUsageResponseToLimits(input);
   return Ref.set(namesRef, names).pipe(Effect.as(limits));
 };
+
+/**
+ * The OAuth usage endpoint answers with the same 0–100 windows as `get_usage`,
+ * keyed by window id. Only the session and weekly windows are read: the
+ * model-scoped row keeps the name the last probe gave it.
+ */
+export function claudeOAuthUsageToUpdate(body: unknown): ProviderUsageLimitsUpdate | undefined {
+  if (typeof body !== "object" || body === null) return undefined;
+  const windows: ServerProviderUsageWindow[] = [];
+  for (const id of Object.keys(WINDOWS)) {
+    const raw = (body as Record<string, unknown>)[id];
+    if (typeof raw !== "object" || raw === null) continue;
+    const { utilization, resets_at: resetsAt } = raw as {
+      readonly utilization?: unknown;
+      readonly resets_at?: unknown;
+    };
+    if (typeof utilization !== "number") continue;
+    windows.push(
+      makeWindow(
+        id,
+        utilization,
+        typeof resetsAt === "string" ? isoFromString(resetsAt) : undefined,
+      ),
+    );
+  }
+  return windows.length === 0 ? undefined : { windows };
+}
