@@ -287,6 +287,7 @@ import {
   formatUpcomingTimestamp,
 } from "../../timestampFormat";
 import { FetchedToolOutput, V2ItemInspector } from "./V2ItemInspector";
+import { ShellCommandRunContext } from "./shellCommandRun";
 import { useV2ItemSupport } from "../../state/v2ItemSupport";
 import { Collapsible, CollapsibleTrigger, CollapsiblePanel } from "../ui/collapsible";
 import {
@@ -537,11 +538,13 @@ export function MessagesTimeline(props: MessagesTimelineProps) {
     if (findOpen) onManualNavigation();
   }, [findOpen, onManualNavigation]);
   return (
-    <ConversationTimeline
-      {...props}
-      {...find}
-      liveFollowEnabled={!findOpen && props.liveFollowEnabled}
-    />
+    <ShellCommandRunContext value={props.onRunShellCommand ?? null}>
+      <ConversationTimeline
+        {...props}
+        {...find}
+        liveFollowEnabled={!findOpen && props.liveFollowEnabled}
+      />
+    </ShellCommandRunContext>
   );
 }
 

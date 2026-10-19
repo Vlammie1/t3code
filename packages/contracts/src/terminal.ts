@@ -43,6 +43,19 @@ export const TerminalOpenInput = Schema.Struct({
 });
 export type TerminalOpenInput = typeof TerminalOpenInput.Type;
 
+/**
+ * Runs one command in a new terminal of the thread. When it exits with a
+ * failure, its output goes to the thread's agent; a success stays quiet.
+ */
+export const TerminalRunCommandInput = Schema.Struct({
+  ...TerminalSessionInput.fields,
+  cwd: TrimmedNonEmptyStringSchema,
+  worktreePath: Schema.optional(Schema.NullOr(TrimmedNonEmptyStringSchema)),
+  env: Schema.optional(TerminalEnvSchema),
+  command: Schema.String.check(Schema.isNonEmpty()).check(Schema.isMaxLength(16_384)),
+});
+export type TerminalRunCommandInput = typeof TerminalRunCommandInput.Type;
+
 export const TerminalAttachInput = Schema.Struct({
   ...TerminalSessionInput.fields,
   cwd: Schema.optional(TrimmedNonEmptyStringSchema),

@@ -13,7 +13,7 @@ import {
 } from "@t3tools/client-runtime/work-log/item-detail";
 import { formatDiffCount } from "@t3tools/client-runtime/diff-count";
 import { isJavaScriptReplTool } from "@t3tools/shared/toolActivity";
-import { ExternalLinkIcon, GitBranchIcon, RotateCcwIcon } from "lucide-react";
+import { ExternalLinkIcon, GitBranchIcon, PlayIcon, RotateCcwIcon } from "lucide-react";
 import { memo, type ReactNode, Suspense, use } from "react";
 
 import { useTheme } from "../../hooks/useTheme";
@@ -30,6 +30,8 @@ import { CommandOutputPanel, useCommandOutputStreaming } from "./CommandOutputPa
 import { resolveExternalWebLinkHref } from "./externalLinkContextMenu";
 import type { ExpandedImagePreview } from "./ExpandedImagePreview";
 import { ShellCommandBlock } from "./ShellCommandBlock";
+import { ShellCommandRunContext } from "./shellCommandRun";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
 interface V2ItemInspectorProps {
   readonly projectedItem: OrchestrationV2ProjectedTurnItem;
@@ -196,6 +198,30 @@ export function FetchedToolOutput(props: {
   );
 }
 
+function RunCommandButton(props: {
+  readonly command: string;
+  readonly onRun: (command: string) => void;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            type="button"
+            variant="ghost-muted"
+            size="icon-xs"
+            aria-label="Run in terminal"
+            onClick={() => props.onRun(props.command.trim())}
+          />
+        }
+      >
+        <PlayIcon className="size-3" />
+      </TooltipTrigger>
+      <TooltipPopup side="top">Run in terminal</TooltipPopup>
+    </Tooltip>
+  );
+}
+
 function ToolCallBody(
   props: ToolOutputState & {
     readonly command?: string;
@@ -207,9 +233,19 @@ function ToolCallBody(
   },
 ) {
   const call = toolCallLines({ command: props.command, args: props.args });
+  const runShellCommand = use(ShellCommandRunContext);
   return (
     <div className={cn("space-y-1.5", monoClassName)}>
-      {call.command ? <ShellCommandBlock command={call.command} /> : null}
+      {call.command ? (
+        <div className="flex items-start gap-1.5">
+          <div className="min-w-0 flex-1">
+            <ShellCommandBlock command={call.command} />
+          </div>
+          {runShellCommand ? (
+            <RunCommandButton command={call.command} onRun={runShellCommand} />
+          ) : null}
+        </div>
+      ) : null}
       {call.args ? (
         <div className="text-foreground/85">
           {call.args.map(([key, value]) => (

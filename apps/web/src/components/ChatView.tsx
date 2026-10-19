@@ -3546,16 +3546,21 @@ export default function ChatView(props: ChatViewProps) {
     runProjectScriptRef.current = runProjectScriptStable;
   }, [runProjectScriptStable]);
   const runShellCommand = (command: string) => {
-    void runProjectScriptRef.current(
-      {
-        id: "chat-code-block",
-        name: "Chat code block",
-        command,
-        icon: "play",
-        runOnWorktreeCreate: false,
-      },
-      { rememberAsLastInvoked: false },
-    );
+    if (!activeThreadRef || !activeThreadId) return;
+    setTerminalOpen(true);
+    setTerminalFocusRequestId((value) => value + 1);
+    const result = terminalActions.runCommandInTerminal({
+      command,
+      place: (terminalId) => storeNewTerminal(activeThreadRef, terminalId),
+    });
+    void result?.then((outcome) => {
+      if (outcome._tag !== "Failure" || isAtomCommandInterrupted(outcome)) return;
+      const error = squashAtomCommandFailure(outcome);
+      setThreadError(
+        activeThreadId,
+        error instanceof Error ? error.message : "Failed to run the command.",
+      );
+    });
   };
   const runShellCommandStable = useStableCallback(runShellCommand);
 

@@ -33,6 +33,7 @@ export interface TerminalLaunchLocation {
 export function useThreadTerminalActions(threadRef: ScopedThreadRef | null) {
   const openTerminalCommand = useAtomCommand(terminalEnvironment.open, "terminal open");
   const writeTerminal = useAtomCommand(terminalEnvironment.write, "terminal write");
+  const runCommandCommand = useAtomCommand(terminalEnvironment.runCommand, "terminal run command");
   const closeTerminalCommand = useAtomCommand(terminalEnvironment.close, "terminal close");
   const serverThread = useQuietThreadShell(threadRef);
   const draftThread = useComposerDraftStore((store) =>
@@ -144,6 +145,35 @@ export function useThreadTerminalActions(threadRef: ScopedThreadRef | null) {
     })();
   };
 
+  /**
+   * Runs `command` in a new terminal. The server watches its exit code and hands
+   * a failure's output to the thread's agent; a success stays quiet.
+   */
+  const runCommandInTerminal = (input: {
+    readonly command: string;
+    readonly place: (terminalId: string) => void;
+  }) => {
+    if (!threadRef || !canWrite() || !project) return null;
+    const location = defaultLaunchLocation();
+    if (!location) return null;
+    const terminalId = allocateTerminalId();
+    input.place(terminalId);
+    return runCommandCommand({
+      environmentId: threadRef.environmentId,
+      input: {
+        threadId: threadRef.threadId,
+        terminalId,
+        cwd: location.cwd,
+        ...(location.worktreePath !== null ? { worktreePath: location.worktreePath } : {}),
+        env: projectScriptRuntimeEnv({
+          project: { cwd: project.workspaceRoot },
+          worktreePath: location.worktreePath,
+        }),
+        command: input.command,
+      },
+    });
+  };
+
   const writeToTerminal = (terminalId: string, data: string) => {
     if (!threadRef || !canWrite()) return null;
     return writeTerminal({
@@ -158,5 +188,6 @@ export function useThreadTerminalActions(threadRef: ScopedThreadRef | null) {
     launchTerminal: useStableCallback(launchTerminal),
     closeTerminalSession: useStableCallback(closeTerminalSession),
     writeToTerminal: useStableCallback(writeToTerminal),
+    runCommandInTerminal: useStableCallback(runCommandInTerminal),
   };
 }

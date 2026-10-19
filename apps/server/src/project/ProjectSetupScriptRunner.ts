@@ -122,11 +122,11 @@ const COMPLETION_SENTINEL_PREFIX = "__T3_SETUP_DONE__";
 const OUTPUT_LINE_MAX_LENGTH = 400;
 const PARTIAL_LINE_MAX_LENGTH = 4_096;
 
-function completionSentinel(token: string): string {
+export function completionSentinel(token: string): string {
   return `${COMPLETION_SENTINEL_PREFIX}_${token}:`;
 }
 
-function completionSentinelPattern(token: string): RegExp {
+export function completionSentinelPattern(token: string): RegExp {
   return new RegExp(`${COMPLETION_SENTINEL_PREFIX}_${token}:(-?\\d+)`);
 }
 
@@ -143,9 +143,9 @@ function stripTerminalControl(text: string): string {
   );
 }
 
-type CompletionShell = "posix" | "fish" | "powershell";
+export type CompletionShell = "posix" | "fish" | "powershell";
 
-function resolveCompletionShell(
+export function resolveCompletionShell(
   platform: NodeJS.Platform,
   env: NodeJS.ProcessEnv,
 ): CompletionShell {
@@ -163,7 +163,7 @@ function resolveCompletionShell(
  * block before running any of it, so a script that reads stdin cannot consume the sentinel line
  * either.
  */
-function wrapCommandForCompletion(
+export function wrapCommandForCompletion(
   command: string,
   shell: CompletionShell,
   sentinel: string,
@@ -179,6 +179,98 @@ function wrapCommandForCompletion(
   }
 }
 
+export const observeTerminalCompletion = (
+  terminalManager: TerminalManager.TerminalManager["Service"],
+  input: {
+    readonly threadId: string;
+    readonly terminalId: string;
+    readonly sentinel: string;
+    readonly sentinelPattern: RegExp;
+    /** The shell echoes typed input; lines ending with these are the wrapper, not output. */
+    readonly echoedWrapperLines: ReadonlyArray<string>;
+    readonly onOutputLine: ((line: string) => Effect.Effect<void>) | undefined;
+  },
+) =>
+  Effect.gen(function* () {
+    const startedAtMs = yield* Clock.currentTimeMillis;
+    const done = yield* Deferred.make<ProjectSetupScriptCompletion>();
+    // The shell redraws its prompt just after the sentinel. Closing before
+    // that would read the redraw as new activity and keep an idle shell.
+    const promptReturned = yield* Deferred.make<void>();
+    let lineBuffer = "";
+    let settled = false;
+
+    const settle = (exitCode: number | null) =>
+      Effect.suspend(() => {
+        if (settled) return Effect.void;
+        settled = true;
+        return Clock.currentTimeMillis.pipe(
+          Effect.flatMap((nowMs) =>
+            Deferred.succeed(done, { exitCode, durationMs: nowMs - startedAtMs }),
+          ),
+          Effect.asVoid,
+        );
+      });
+
+    const handleLine = (rawLine: string) =>
+      Effect.suspend(() => {
+        const sentinel = input.sentinelPattern.exec(rawLine);
+        if (sentinel) {
+          const parsed = Number(sentinel[1]);
+          return settle(Number.isFinite(parsed) ? parsed : null);
+        }
+        const cleaned = stripTerminalControl(rawLine).trimEnd();
+        if (
+          cleaned.length === 0 ||
+          cleaned.includes(input.sentinel) ||
+          input.echoedWrapperLines.some((echoed) => cleaned.endsWith(echoed)) ||
+          input.onOutputLine === undefined
+        ) {
+          return Effect.void;
+        }
+        return input.onOutputLine(cleaned.slice(0, OUTPUT_LINE_MAX_LENGTH));
+      });
+
+    const unsubscribe = yield* terminalManager.subscribe((event) => {
+      if (event.threadId !== input.threadId || event.terminalId !== input.terminalId) {
+        return Effect.void;
+      }
+      if (event.type === "output") {
+        lineBuffer += event.data;
+        // A bare carriage return is how installers redraw a progress line in
+        // place; each redraw becomes a short line of its own instead of being
+        // glued into one long one.
+        const lines = lineBuffer.split(/\r\n|\r|\n/);
+        lineBuffer = lines.pop() ?? "";
+        // A script that never prints a newline must not grow this forever.
+        // The sentinel is always on its own line, so keeping the tail is safe.
+        if (lineBuffer.length > PARTIAL_LINE_MAX_LENGTH) {
+          lineBuffer = lineBuffer.slice(-PARTIAL_LINE_MAX_LENGTH);
+        }
+        return Effect.forEach(lines, handleLine, { discard: true }).pipe(
+          Effect.andThen(
+            Effect.suspend(() =>
+              settled && lineBuffer.length > 0
+                ? Deferred.succeed(promptReturned, undefined).pipe(Effect.asVoid)
+                : Effect.void,
+            ),
+          ),
+        );
+      }
+      if (event.type === "exited" || event.type === "closed") {
+        return settle(null).pipe(Effect.andThen(Deferred.succeed(promptReturned, undefined)));
+      }
+      return Effect.void;
+    });
+
+    const completion = Deferred.await(done).pipe(
+      // A shell with an empty prompt never prints one; do not wait forever.
+      Effect.tap(() => Deferred.await(promptReturned).pipe(Effect.timeoutOption("1 second"))),
+      Effect.ensuring(Effect.sync(() => unsubscribe())),
+    );
+    return { completion, unsubscribe };
+  });
+
 /** @public Service construction is part of the canonical Effect module API. */
 export const make = Effect.gen(function* () {
   const projects = yield* ProjectService.ProjectService;
@@ -189,95 +281,6 @@ export const make = Effect.gen(function* () {
     yield* HostProcess.Platform,
     yield* HostProcess.Environment,
   );
-
-  const observeTerminalCompletion = (input: {
-    readonly threadId: string;
-    readonly terminalId: string;
-    readonly sentinel: string;
-    readonly sentinelPattern: RegExp;
-    /** The shell echoes typed input; lines ending with these are the wrapper, not output. */
-    readonly echoedWrapperLines: ReadonlyArray<string>;
-    readonly onOutputLine: ((line: string) => Effect.Effect<void>) | undefined;
-  }) =>
-    Effect.gen(function* () {
-      const startedAtMs = yield* Clock.currentTimeMillis;
-      const done = yield* Deferred.make<ProjectSetupScriptCompletion>();
-      // The shell redraws its prompt just after the sentinel. Closing before
-      // that would read the redraw as new activity and keep an idle shell.
-      const promptReturned = yield* Deferred.make<void>();
-      let lineBuffer = "";
-      let settled = false;
-
-      const settle = (exitCode: number | null) =>
-        Effect.suspend(() => {
-          if (settled) return Effect.void;
-          settled = true;
-          return Clock.currentTimeMillis.pipe(
-            Effect.flatMap((nowMs) =>
-              Deferred.succeed(done, { exitCode, durationMs: nowMs - startedAtMs }),
-            ),
-            Effect.asVoid,
-          );
-        });
-
-      const handleLine = (rawLine: string) =>
-        Effect.suspend(() => {
-          const sentinel = input.sentinelPattern.exec(rawLine);
-          if (sentinel) {
-            const parsed = Number(sentinel[1]);
-            return settle(Number.isFinite(parsed) ? parsed : null);
-          }
-          const cleaned = stripTerminalControl(rawLine).trimEnd();
-          if (
-            cleaned.length === 0 ||
-            cleaned.includes(input.sentinel) ||
-            input.echoedWrapperLines.some((echoed) => cleaned.endsWith(echoed)) ||
-            input.onOutputLine === undefined
-          ) {
-            return Effect.void;
-          }
-          return input.onOutputLine(cleaned.slice(0, OUTPUT_LINE_MAX_LENGTH));
-        });
-
-      const unsubscribe = yield* terminalManager.subscribe((event) => {
-        if (event.threadId !== input.threadId || event.terminalId !== input.terminalId) {
-          return Effect.void;
-        }
-        if (event.type === "output") {
-          lineBuffer += event.data;
-          // A bare carriage return is how installers redraw a progress line in
-          // place; each redraw becomes a short line of its own instead of being
-          // glued into one long one.
-          const lines = lineBuffer.split(/\r\n|\r|\n/);
-          lineBuffer = lines.pop() ?? "";
-          // A script that never prints a newline must not grow this forever.
-          // The sentinel is always on its own line, so keeping the tail is safe.
-          if (lineBuffer.length > PARTIAL_LINE_MAX_LENGTH) {
-            lineBuffer = lineBuffer.slice(-PARTIAL_LINE_MAX_LENGTH);
-          }
-          return Effect.forEach(lines, handleLine, { discard: true }).pipe(
-            Effect.andThen(
-              Effect.suspend(() =>
-                settled && lineBuffer.length > 0
-                  ? Deferred.succeed(promptReturned, undefined).pipe(Effect.asVoid)
-                  : Effect.void,
-              ),
-            ),
-          );
-        }
-        if (event.type === "exited" || event.type === "closed") {
-          return settle(null).pipe(Effect.andThen(Deferred.succeed(promptReturned, undefined)));
-        }
-        return Effect.void;
-      });
-
-      const completion = Deferred.await(done).pipe(
-        // A shell with an empty prompt never prints one; do not wait forever.
-        Effect.tap(() => Deferred.await(promptReturned).pipe(Effect.timeoutOption("1 second"))),
-        Effect.ensuring(Effect.sync(() => unsubscribe())),
-      );
-      return { completion, unsubscribe };
-    });
 
   const runForThread: ProjectSetupScriptRunner["Service"]["runForThread"] = Effect.fn(
     "ProjectSetupScriptRunner.runForThread",
@@ -396,7 +399,7 @@ export const make = Effect.gen(function* () {
     // Subscribe before writing so the sentinel cannot race past the listener.
     const observed =
       observe && completionToken
-        ? yield* observeTerminalCompletion({
+        ? yield* observeTerminalCompletion(terminalManager, {
             threadId: input.threadId,
             terminalId,
             sentinel: completionSentinel(completionToken),
