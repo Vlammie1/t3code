@@ -569,6 +569,8 @@ export function MarkdownDocumentSurface(props: {
   };
 
   // Editor callbacks are registered once, at creation, so they read the editor through a ref.
+  // StrictMode creates and destroys a first editor, so the ref follows the editor that
+  // reports events rather than the one that was created first.
   const editorRef = useRef<Editor | null>(null);
   const anchorFor = (from: number, to: number): SelectionAnchor | null => {
     const current = editorRef.current;
@@ -655,8 +657,11 @@ export function MarkdownDocumentSurface(props: {
           return false;
         },
       },
-      onCreate: ({ editor: created }) => {
-        editorRef.current = created;
+      onTransaction: ({ editor: live }) => {
+        editorRef.current = live;
+      },
+      onFocus: ({ editor: live }) => {
+        editorRef.current = live;
       },
       onUpdate: () => scheduleSave(),
       onSelectionUpdate: () => readSelection(),
@@ -670,7 +675,7 @@ export function MarkdownDocumentSurface(props: {
     [],
   );
   useLayoutEffect(() => {
-    editorRef.current = editor;
+    if (editor && !editor.isDestroyed) editorRef.current = editor;
   }, [editor]);
 
   // Typing that has not reached its save yet is written before the surface goes.
