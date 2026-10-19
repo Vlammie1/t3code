@@ -68,7 +68,10 @@ function Main({ className, ...props }: ComponentProps<"div">) {
         outlineClasses,
         contextSeamClasses,
         "after:z-20 after:hidden group-has-data-[composer-banner-surface=attached]/composer-surface:after:block group-data-model-strip-transition/composer-surface:after:block",
-        "group-has-data-[composer-banner-surface=attached]/composer-surface:bg-(--chat-composer-glass-surface)/(--glass-opacity) group-has-data-[composer-banner-surface=attached]/composer-surface:backdrop-blur-(--glass-blur) group-has-data-[composer-banner-surface=attached]/composer-surface:backdrop-saturate-(--glass-saturation)",
+        // Between an attached strip above and the model strip below, the input shares their
+        // surface; a lifted fill (dark) and a firmer outline keep it readable as the field.
+        "[--chat-composer-input-surface:var(--chat-composer-glass-surface)] dark:[--chat-composer-input-surface:color-mix(in_srgb,var(--chat-composer-glass-surface),var(--foreground)_5%)] group-has-data-[composer-banner-surface=attached]/composer-surface:after:border-foreground/14",
+        "group-has-data-[composer-banner-surface=attached]/composer-surface:bg-(--chat-composer-input-surface)/(--glass-opacity) group-has-data-[composer-banner-surface=attached]/composer-surface:backdrop-blur-(--glass-blur) group-has-data-[composer-banner-surface=attached]/composer-surface:backdrop-saturate-(--glass-saturation)",
         "group-has-data-[composer-banner-surface=attached]/composer-surface:shadow-composer dark:group-has-data-[composer-banner-surface=attached]/composer-surface:shadow-none",
         "not-supports-[((backdrop-filter:blur(1px))_or_(-webkit-backdrop-filter:blur(1px)))]:group-has-data-[composer-banner-surface=attached]/composer-surface:bg-(--chat-composer-glass-surface)",
         "group-has-data-[composer-banner-surface=attached]/composer-surface:**:data-[chat-composer-mobile-collapsed=true]:min-h-[calc(1rem+1px)]",
@@ -79,14 +82,20 @@ function Main({ className, ...props }: ComponentProps<"div">) {
   );
 }
 
-/** Extends the composer outline below the input, masking its overlap up to one pixel above the shared edge so no seam shows. */
+/**
+ * Extends the composer outline below the input, masking its overlap up to one pixel above the shared edge so no seam shows.
+ * The mask is one arbitrary property because tailwind-merge reads the `mask-b-from-(length:…)`
+ * stop and the `mask-b-from-transparent` colour as one group and drops the colours, which
+ * inverts the mask and leaves only the hidden overlap painted: the transcript then shows
+ * through the model row whenever this strip carries its own backdrop.
+ */
 function ContextStrip({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
       data-slot="composer-context-strip"
       className={cn(
         "group/composer-context relative isolate mx-auto -mt-4 flex w-[calc(100%-2*var(--chat-composer-drawer-inset))] items-center gap-2 overflow-x-clip overflow-y-visible px-2 pt-5 pb-1",
-        "before:absolute before:inset-0 before:-z-1 before:rounded-b-2xl before:border before:border-(--chat-composer-outline) before:mask-b-from-transparent before:mask-b-from-(length:--spacing-composer-seam) before:mask-b-to-black before:mask-b-to-(length:--spacing-composer-seam) before:shadow-composer",
+        "before:absolute before:inset-0 before:-z-1 before:rounded-b-2xl before:border before:border-(--chat-composer-outline) before:[mask-image:linear-gradient(to_bottom,transparent_var(--spacing-composer-seam),black_var(--spacing-composer-seam))] before:shadow-composer",
         "dark:before:border-white/7 dark:before:bg-composer-seam-below dark:before:shadow-composer-dark",
         "group-has-data-[composer-banner-surface=attached]/composer-surface:before:bg-(--chat-composer-glass-surface)/(--glass-opacity) group-has-data-[composer-banner-surface=attached]/composer-surface:before:backdrop-blur-(--glass-blur) group-has-data-[composer-banner-surface=attached]/composer-surface:before:backdrop-saturate-(--glass-saturation)",
         "not-supports-[clip-path:shape(from_0_0,line_to_1px_1px)]:before:bg-(--chat-composer-glass-surface)/(--glass-opacity) not-supports-[clip-path:shape(from_0_0,line_to_1px_1px)]:before:backdrop-blur-(--glass-blur) not-supports-[clip-path:shape(from_0_0,line_to_1px_1px)]:before:backdrop-saturate-(--glass-saturation)",
