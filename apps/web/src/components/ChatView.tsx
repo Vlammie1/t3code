@@ -255,7 +255,7 @@ import {
   usePreviewMiniPlayerStore,
 } from "../previewMiniPlayerStore";
 import { threadPullRequestPanelTarget } from "./pullRequest/pullRequestDetail.logic";
-import { RightPanelTabs } from "./RightPanelTabs";
+import { RightPanelTabs, rightPanelSurfaceActions } from "./RightPanelTabs";
 import { LinkPullRequestDialogHost } from "./pullRequest/LinkPullRequestDialog";
 import { useDeviceState } from "~/state/device";
 import { BranchToolbar, type BranchToolbarHandle } from "./BranchToolbar";
@@ -7785,6 +7785,24 @@ export default function ChatView(props: ChatViewProps) {
     rightPanelAvailable: activeProject !== null,
     rightPanelOpen,
     rightPanelShortcutLabel: shortcutLabelForCommand(keybindings, "rightPanel.toggle"),
+    rightPanelEmpty: rightPanelState.surfaces.length === 0,
+    rightPanelLaunchActions: rightPanelSurfaceActions({
+      onAddBrowser: () => createBrowserSurface(),
+      onAddTerminal: addTerminalSurfaceStable,
+      onAddDiff: addDiffSurfaceStable,
+      onAddFiles: addFilesSurfaceStable,
+      onAddPullRequest: addPullRequestSurfaceStable,
+      onAddPullRequests: addPullRequestsSurfaceStable,
+      onAddImages: addImagesSurfaceStable,
+      onAddDevice: addDeviceSurfaceStable,
+      browserAvailable: canOperatePreview && browserAvailable,
+      terminalAvailable: activeProject !== null && canOperateTerminal,
+      diffAvailable: isServerThread && isGitRepo,
+      filesAvailable: activeProject !== null,
+      pullRequestAvailable: pullRequestSurfaceAvailable,
+      pullRequestsAvailable: pullRequestsSurfaceAvailable,
+      deviceAvailable: activeThreadRef !== null,
+    }),
     onToggleTerminal: toggleTerminalVisibilityStable,
     onToggleThreadPanel: toggleThreadPanelStable,
     onToggleRightPanel: toggleRightPanelStable,

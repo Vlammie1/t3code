@@ -972,6 +972,97 @@ function RightPanelTab(
   );
 }
 
+export type RightPanelSurfaceActionInput = Pick<
+  RightPanelTabsProps,
+  | "browserAvailable"
+  | "terminalAvailable"
+  | "filesAvailable"
+  | "diffAvailable"
+  | "pullRequestAvailable"
+  | "pullRequestsAvailable"
+  | "deviceAvailable"
+  | "onAddBrowser"
+  | "onAddTerminal"
+  | "onAddFiles"
+  | "onAddDiff"
+  | "onAddPullRequest"
+  | "onAddPullRequests"
+  | "onAddImages"
+  | "onAddDevice"
+>;
+
+/** What the panel can open; the tab bar's + menu and the closed panel's toggle share it. */
+export function rightPanelSurfaceActions(props: RightPanelSurfaceActionInput) {
+  return [
+    {
+      label: "Browser",
+      icon: Globe2,
+      shortcut: "B",
+      available: props.browserAvailable,
+      disabledReason: SURFACE_DISABLED_REASONS.browser,
+      onClick: props.onAddBrowser,
+    },
+    {
+      label: "Terminal",
+      icon: TerminalSquare,
+      shortcut: "T",
+      available: props.terminalAvailable,
+      disabledReason: SURFACE_DISABLED_REASONS.terminal,
+      onClick: props.onAddTerminal,
+    },
+    {
+      label: "Files",
+      icon: Files,
+      shortcut: "F",
+      available: props.filesAvailable,
+      disabledReason: SURFACE_DISABLED_REASONS.files,
+      onClick: props.onAddFiles,
+    },
+    {
+      label: "Diff",
+      icon: FileDiff,
+      shortcut: "D",
+      available: props.diffAvailable,
+      disabledReason: SURFACE_DISABLED_REASONS.diff,
+      onClick: props.onAddDiff,
+    },
+    {
+      label: "Pull request",
+      icon: PullRequestGlyph.pullRequest,
+      shortcut: "P",
+      available: props.pullRequestAvailable,
+      disabledReason: SURFACE_DISABLED_REASONS.pullRequest,
+      onClick: props.onAddPullRequest,
+    },
+    {
+      label: "Linked pull requests",
+      icon: PullRequestGlyph.link,
+      shortcut: "L",
+      available: props.pullRequestsAvailable,
+      disabledReason: SURFACE_DISABLED_REASONS.pullRequests,
+      onClick: props.onAddPullRequests,
+    },
+    {
+      label: "Images",
+      icon: Images,
+      shortcut: "I",
+      available: true,
+      disabledReason: SURFACE_DISABLED_REASONS.images,
+      onClick: props.onAddImages,
+    },
+    {
+      label: "Device",
+      icon: Smartphone,
+      shortcut: "M",
+      available: props.deviceAvailable,
+      disabledReason: SURFACE_DISABLED_REASONS.device,
+      onClick: props.onAddDevice,
+    },
+  ] as const;
+}
+
+export type RightPanelSurfaceAction = ReturnType<typeof rightPanelSurfaceActions>[number];
+
 export function RightPanelTabs(props: RightPanelTabsProps) {
   const ownsDesktopTitleBar = isElectron && props.mode === "inline";
   const browserProfiles = useBrowserDefaults().profiles;
@@ -1041,72 +1132,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
     });
   };
 
-  const addSurfaceActions = [
-    {
-      label: "Browser",
-      icon: Globe2,
-      shortcut: "B",
-      available: props.browserAvailable,
-      disabledReason: SURFACE_DISABLED_REASONS.browser,
-      onClick: props.onAddBrowser,
-    },
-    {
-      label: "Terminal",
-      icon: TerminalSquare,
-      shortcut: "T",
-      available: props.terminalAvailable,
-      disabledReason: SURFACE_DISABLED_REASONS.terminal,
-      onClick: props.onAddTerminal,
-    },
-    {
-      label: "Files",
-      icon: Files,
-      shortcut: "F",
-      available: props.filesAvailable,
-      disabledReason: SURFACE_DISABLED_REASONS.files,
-      onClick: props.onAddFiles,
-    },
-    {
-      label: "Diff",
-      icon: FileDiff,
-      shortcut: "D",
-      available: props.diffAvailable,
-      disabledReason: SURFACE_DISABLED_REASONS.diff,
-      onClick: props.onAddDiff,
-    },
-    {
-      label: "Pull request",
-      icon: PullRequestGlyph.pullRequest,
-      shortcut: "P",
-      available: props.pullRequestAvailable,
-      disabledReason: SURFACE_DISABLED_REASONS.pullRequest,
-      onClick: props.onAddPullRequest,
-    },
-    {
-      label: "Linked pull requests",
-      icon: PullRequestGlyph.link,
-      shortcut: "L",
-      available: props.pullRequestsAvailable,
-      disabledReason: SURFACE_DISABLED_REASONS.pullRequests,
-      onClick: props.onAddPullRequests,
-    },
-    {
-      label: "Images",
-      icon: Images,
-      shortcut: "I",
-      available: true,
-      disabledReason: SURFACE_DISABLED_REASONS.images,
-      onClick: props.onAddImages,
-    },
-    {
-      label: "Device",
-      icon: Smartphone,
-      shortcut: "M",
-      available: props.deviceAvailable,
-      disabledReason: SURFACE_DISABLED_REASONS.device,
-      onClick: props.onAddDevice,
-    },
-  ] as const;
+  const addSurfaceActions = rightPanelSurfaceActions(props);
 
   const handleAddSurfaceMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     const action = surfaceShortcutActionForKey(addSurfaceActions, event.nativeEvent);

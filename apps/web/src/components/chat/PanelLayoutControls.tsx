@@ -4,6 +4,8 @@ import { MorphIcon } from "~/components/MorphIcon";
 import { memo, type ReactElement } from "react";
 
 import type { ThreadPanelPresentation } from "../../rightPanelLayout";
+import type { RightPanelSurfaceAction } from "../RightPanelTabs";
+import { Menu, MenuItem, MenuPopup, MenuShortcut, MenuTrigger } from "../ui/menu";
 import { PopoverCreateHandle, PopoverTrigger } from "../ui/popover";
 import { Toggle } from "../ui/toggle";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
@@ -23,6 +25,12 @@ export interface PanelLayoutControlsProps {
   rightPanelOpen: boolean;
   rightPanelShortcutLabel: string | null;
   rightPanelUnavailableLabel?: string;
+  /**
+   * With nothing in the panel there is nothing to restore, so the toggle asks
+   * what to open instead of showing an empty panel.
+   */
+  rightPanelEmpty?: boolean;
+  rightPanelLaunchActions?: ReadonlyArray<RightPanelSurfaceAction>;
   onToggleTerminal: () => void;
   onToggleThreadPanel: () => void;
   onToggleRightPanel: () => void;
@@ -43,6 +51,8 @@ export const PanelLayoutControls = memo(function PanelLayoutControls({
   rightPanelOpen,
   rightPanelShortcutLabel,
   rightPanelUnavailableLabel = "Right panel is unavailable",
+  rightPanelEmpty = false,
+  rightPanelLaunchActions,
   onToggleTerminal,
   onToggleThreadPanel,
   onToggleRightPanel,
@@ -105,7 +115,54 @@ export const PanelLayoutControls = memo(function PanelLayoutControls({
           </TooltipPopup>
         </Tooltip>
       ) : null}
-      {showRightPanelControl ? (
+      {showRightPanelControl &&
+      rightPanelAvailable &&
+      !rightPanelOpen &&
+      rightPanelEmpty &&
+      rightPanelLaunchActions ? (
+        <Menu>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <MenuTrigger
+                  render={
+                    <Toggle
+                      className="shrink-0 [-webkit-app-region:no-drag]"
+                      pressed={false}
+                      aria-label="Open right panel"
+                      data-right-panel-toggle
+                      variant="ghost"
+                      size="sm"
+                    />
+                  }
+                />
+              }
+            >
+              <PanelRightIcon className="size-4" />
+            </TooltipTrigger>
+            <TooltipPopup side="bottom">
+              {`Open right panel${rightPanelShortcutLabel ? ` (${rightPanelShortcutLabel})` : ""}`}
+            </TooltipPopup>
+          </Tooltip>
+          <MenuPopup align="end" side="bottom" sideOffset={6}>
+            {rightPanelLaunchActions.map((action) => {
+              const Icon = action.icon;
+              return (
+                <MenuItem
+                  key={action.label}
+                  disabled={!action.available}
+                  title={action.available ? undefined : action.disabledReason}
+                  onClick={action.onClick}
+                >
+                  <Icon />
+                  {action.label}
+                  <MenuShortcut>{action.shortcut}</MenuShortcut>
+                </MenuItem>
+              );
+            })}
+          </MenuPopup>
+        </Menu>
+      ) : showRightPanelControl ? (
         <Tooltip>
           <TooltipTrigger render={<span className="flex shrink-0" />}>
             <Toggle
