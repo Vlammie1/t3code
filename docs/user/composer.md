@@ -334,14 +334,17 @@ styles, or images from neighboring files.
 
 ## Markdown files in the file viewer
 
-On web and desktop, Markdown files open as a formatted document. Click a paragraph to edit
-its Markdown in place; the change saves when you click away or press Escape. Switch to source
-view for the whole file.
+On web and desktop, Markdown files open as a document that takes most of the window, with the
+chat in a narrow column beside it. Type in it like any editor; it saves as you go. Selecting
+text shows a toolbar for comments, text style, bold, italic, underline, strikethrough, code,
+highlight, lists and links. Switch to source view to edit the Markdown directly. Saving writes
+the whole file back as Markdown, so spacing such as table column padding can change.
 
-Select text and choose **Comment** to leave a comment beside it. Start a comment or reply with
-`@Claude` to send it to the chat's agent, which answers in the same comment. Comments are stored
-in the file itself, in a hidden block at the end, so any agent that reads the file sees them.
-Resolving a comment removes it from the file.
+Choose **Comment** in the toolbar, or press `Ctrl+Alt+M` (`Cmd+Option+M` on Mac), to comment on
+the selected text. With **Send to Claude** checked, or a comment that starts with `@Claude`,
+the chat's agent receives it and answers in the same comment. Comments are stored in the file
+itself, in a hidden block at the end, so any agent that reads the file sees them. Resolving a
+comment removes it from the file.
 
 ## HTML and PDF files in the file viewer
 

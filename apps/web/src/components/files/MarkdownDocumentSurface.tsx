@@ -1,23 +1,33 @@
 import type { EnvironmentId, ScopedThreadRef } from "@t3tools/contracts";
-import { resolvePathLinkTarget } from "@t3tools/shared/fileLinks";
 import { isAtomCommandInterrupted } from "@t3tools/client-runtime/state/runtime";
-import {
-  memo,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type MouseEvent as ReactMouseEvent,
-} from "react";
+import type { Editor } from "@tiptap/core";
+import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
-import { CheckIcon, MessageSquareIcon } from "~/components/appIcons";
-import ChatMarkdown from "~/components/ChatMarkdown";
+import {
+  ArrowUpIcon,
+  BoldIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  Code2,
+  CommentAddIcon,
+  HighlighterIcon,
+  ItalicIcon,
+  LinkIcon,
+  ListIcon,
+  ListOrderedIcon,
+  ListTodoIcon,
+  StrikethroughIcon,
+  UnderlineIcon,
+} from "~/components/appIcons";
 import { RelativeTime } from "~/components/RelativeTime";
 import { Button } from "~/components/ui/button";
+import { Checkbox } from "~/components/ui/checkbox";
+import { Menu, MenuItem, MenuPopup, MenuTrigger } from "~/components/ui/menu";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { Textarea } from "~/components/ui/textarea";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 import { stackedThreadToast, toastManager } from "~/components/ui/toast";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 import { useStableCallback } from "~/hooks/useStableCallback";
 import { observeResize } from "~/lib/observeResize";
 import { cn, newMessageId } from "~/lib/utils";
@@ -25,8 +35,7 @@ import { useThreadShell } from "~/state/entities";
 import { threadEnvironment } from "~/state/threads";
 import { useOrchestrationCommand } from "~/state/use-orchestration-command";
 
-import { setMarkdownTaskChecked } from "./filePreviewMode";
-import { appendMarkdownBlock, replaceMarkdownBlock, splitMarkdownBlocks } from "./markdownBlocks";
+import { markdownDocumentExtensions } from "./markdownDocumentEditor";
 import {
   type MarkdownComment,
   agentCommentRequest,
@@ -45,8 +54,11 @@ import { useFileSaveCoordinator } from "./useFileSaveCoordinator";
 const COMMENT_HIGHLIGHT = "t3-markdown-comment";
 const ACTIVE_COMMENT_HIGHLIGHT = "t3-markdown-comment-active";
 /** Below this width the comments move from the margin to under the document. */
-const MARGIN_LAYOUT_MIN_WIDTH = 820;
+const MARGIN_LAYOUT_MIN_WIDTH = 900;
 const CARD_GAP_PX = 8;
+const SAVE_DELAY_MS = 300;
+const TOOLBAR_WIDTH_PX = 440;
+const POPOVER_WIDTH_PX = 360;
 const USER_AUTHOR = "You";
 
 // CSS highlights are one registry per page, and several documents can be open
@@ -81,23 +93,17 @@ function buildTextIndex(root: HTMLElement): TextIndex {
   const nodeIndex: number[] = [];
   const offsets: number[] = [];
   let text = "";
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-    acceptNode: (node) =>
-      node.parentElement?.closest("[data-markdown-editing], textarea, button")
-        ? NodeFilter.FILTER_REJECT
-        : NodeFilter.FILTER_ACCEPT,
-  });
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
     const textNode = node as Text;
     const value = textNode.data;
     nodes.push(textNode);
     for (let offset = 0; offset < value.length; offset += 1) {
-      const character = value[offset]!;
-      if (/\s/.test(character)) {
+      if (/\s/.test(value[offset]!)) {
         if (text === "" || text.endsWith(" ")) continue;
         text += " ";
       } else {
-        text += character;
+        text += value[offset];
       }
       nodeIndex.push(nodes.length - 1);
       offsets.push(offset);
@@ -131,112 +137,210 @@ function caretFromPoint(x: number, y: number): { node: Node; offset: number } | 
   return range ? { node: range.startContainer, offset: range.startOffset } : null;
 }
 
-/** Finds where the click lands in the block's source by the rendered text just before it. */
-function sourceCaret(source: string, renderedPrefix: string): number {
-  const prefix = renderedPrefix.replace(/\s+/g, " ");
-  for (const length of [24, 12, 6, 3]) {
-    if (prefix.length < length) continue;
-    const tail = prefix.slice(-length);
-    const index = source.replace(/\s/g, " ").indexOf(tail);
-    if (index !== -1) return index + length;
-  }
-  return source.length;
+function ToolbarButton(props: {
+  readonly label: string;
+  readonly active?: boolean;
+  readonly onPress: () => void;
+  readonly children: ReactNode;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={props.label}
+            aria-pressed={props.active}
+            data-pressed={props.active ? "" : undefined}
+            onClick={props.onPress}
+          >
+            {props.children}
+          </Button>
+        }
+      />
+      <TooltipPopup>{props.label}</TooltipPopup>
+    </Tooltip>
+  );
 }
 
-const MarkdownBlockView = memo(
-  function MarkdownBlockView(props: {
-    readonly text: string;
-    readonly start: number;
-    readonly cwd: string;
-    readonly imageBaseDir: string;
-    readonly threadRef: ScopedThreadRef;
-    readonly index: number;
-    readonly onTaskListChange:
-      | ((input: { readonly markerOffset: number; readonly checked: boolean }) => void)
-      | undefined;
-  }) {
-    const { start, onTaskListChange } = props;
+function ToolbarDivider() {
+  return <span aria-hidden className="mx-0.5 h-5 w-px shrink-0 bg-border" />;
+}
+
+const TEXT_STYLES = [
+  { label: "Text", level: null },
+  { label: "Heading 1", level: 1 },
+  { label: "Heading 2", level: 2 },
+  { label: "Heading 3", level: 3 },
+] as const;
+
+function SelectionToolbar(props: { readonly editor: Editor; readonly onComment: () => void }) {
+  const { editor } = props;
+  const state = useEditorState({
+    editor,
+    selector: ({ editor: current }) => ({
+      bold: current.isActive("bold"),
+      italic: current.isActive("italic"),
+      underline: current.isActive("underline"),
+      strike: current.isActive("strike"),
+      code: current.isActive("code"),
+      highlight: current.isActive("highlight"),
+      link: current.isActive("link"),
+      href: (current.getAttributes("link").href as string | undefined) ?? "",
+      headingLevel: ([1, 2, 3] as const).find((level) => current.isActive("heading", { level })),
+    }),
+  });
+  const [linkDraft, setLinkDraft] = useState<string | null>(null);
+  const chain = () => editor.chain().focus();
+  const applyLink = () => {
+    const href = linkDraft?.trim() ?? "";
+    if (href === "") chain().extendMarkRange("link").unsetLink().run();
+    else chain().extendMarkRange("link").setLink({ href }).run();
+    setLinkDraft(null);
+  };
+
+  if (linkDraft !== null) {
     return (
-      <div data-markdown-block={props.index}>
-        <ChatMarkdown
-          text={props.text}
-          cwd={props.cwd}
-          imageBaseDir={props.imageBaseDir}
-          threadRef={props.threadRef}
-          onTaskListChange={
-            onTaskListChange
-              ? ({ markerOffset, checked }) =>
-                  onTaskListChange({ markerOffset: start + markerOffset, checked })
-              : undefined
-          }
+      <div className="flex items-center gap-1 p-1">
+        <input
+          autoFocus
+          value={linkDraft}
+          placeholder="Paste a link"
+          aria-label="Link address"
+          className="h-7 w-64 rounded-lg bg-transparent px-2 text-sm text-foreground outline-none placeholder:text-muted-foreground"
+          onChange={(event) => setLinkDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              applyLink();
+            } else if (event.key === "Escape") {
+              event.preventDefault();
+              setLinkDraft(null);
+              editor.commands.focus();
+            }
+          }}
         />
+        <Button size="xs" onClick={applyLink}>
+          {linkDraft.trim() === "" && state.link ? "Remove" : "Apply"}
+        </Button>
       </div>
     );
-  },
-  // The panel hands down a fresh thread ref each render; only its identity matters here.
-  (previous, next) =>
-    previous.text === next.text &&
-    previous.start === next.start &&
-    previous.index === next.index &&
-    previous.cwd === next.cwd &&
-    previous.imageBaseDir === next.imageBaseDir &&
-    previous.onTaskListChange === next.onTaskListChange &&
-    previous.threadRef.environmentId === next.threadRef.environmentId &&
-    previous.threadRef.threadId === next.threadRef.threadId,
-);
+  }
 
-function BlockEditor(props: {
-  readonly initialText: string;
-  readonly initialCaret: number;
-  readonly placeholder?: string;
-  readonly onDone: (text: string) => void;
-}) {
-  const [text, setText] = useState(props.initialText);
-  const ref = useRef<HTMLTextAreaElement>(null);
-  useLayoutEffect(() => {
-    const field = ref.current;
-    if (!field) return;
-    field.focus({ preventScroll: true });
-    field.setSelectionRange(props.initialCaret, props.initialCaret);
-    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- Focus and caret are placed once, when editing starts.
-  }, []);
   return (
-    <div data-markdown-editing className="my-2">
-      <textarea
-        ref={ref}
-        value={text}
-        placeholder={props.placeholder}
-        spellCheck
-        aria-label="Edit block"
-        className="field-sizing-content block min-h-12 w-full resize-none rounded-xl bg-foreground/5 px-3 py-2 font-mono text-sm leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/70"
-        onChange={(event) => setText(event.target.value)}
-        onBlur={() => props.onDone(text)}
-        onKeyDown={(event) => {
-          if (
-            event.key === "Escape" ||
-            ((event.metaKey || event.ctrlKey) && event.key === "Enter")
-          ) {
-            event.preventDefault();
-            event.currentTarget.blur();
+    <div className="flex items-center gap-0.5 p-1">
+      <ToolbarButton label="Comment" onPress={props.onComment}>
+        <CommentAddIcon className="size-4" />
+      </ToolbarButton>
+      <ToolbarDivider />
+      <Menu>
+        <MenuTrigger
+          render={
+            <Button variant="ghost" size="sm" aria-label="Text style">
+              <span className="font-medium">Aa</span>
+              <ChevronDownIcon className="size-3" />
+            </Button>
           }
-        }}
-      />
+        />
+        <MenuPopup align="start">
+          {TEXT_STYLES.map((style) => (
+            <MenuItem
+              key={style.label}
+              onClick={() => {
+                if (style.level === null) chain().setParagraph().run();
+                else chain().setHeading({ level: style.level }).run();
+              }}
+            >
+              <span className="flex-1">{style.label}</span>
+              {(state.headingLevel ?? null) === style.level ? (
+                <CheckIcon className="size-3.5" />
+              ) : null}
+            </MenuItem>
+          ))}
+        </MenuPopup>
+      </Menu>
+      <ToolbarButton label="Bold" active={state.bold} onPress={() => chain().toggleBold().run()}>
+        <BoldIcon className="size-4" />
+      </ToolbarButton>
+      <ToolbarButton
+        label="Italic"
+        active={state.italic}
+        onPress={() => chain().toggleItalic().run()}
+      >
+        <ItalicIcon className="size-4" />
+      </ToolbarButton>
+      <ToolbarButton
+        label="Underline"
+        active={state.underline}
+        onPress={() => chain().toggleUnderline().run()}
+      >
+        <UnderlineIcon className="size-4" />
+      </ToolbarButton>
+      <ToolbarButton
+        label="Strikethrough"
+        active={state.strike}
+        onPress={() => chain().toggleStrike().run()}
+      >
+        <StrikethroughIcon className="size-4" />
+      </ToolbarButton>
+      <ToolbarButton label="Code" active={state.code} onPress={() => chain().toggleCode().run()}>
+        <Code2 className="size-4" />
+      </ToolbarButton>
+      <ToolbarButton
+        label="Highlight"
+        active={state.highlight}
+        onPress={() => chain().toggleHighlight().run()}
+      >
+        <HighlighterIcon className="size-4" />
+      </ToolbarButton>
+      <ToolbarDivider />
+      <Menu>
+        <MenuTrigger
+          render={
+            <Button variant="ghost" size="sm" aria-label="List">
+              <ListIcon className="size-4" />
+              <ChevronDownIcon className="size-3" />
+            </Button>
+          }
+        />
+        <MenuPopup align="start">
+          <MenuItem onClick={() => chain().toggleBulletList().run()}>
+            <ListIcon className="size-4" />
+            Bulleted list
+          </MenuItem>
+          <MenuItem onClick={() => chain().toggleOrderedList().run()}>
+            <ListOrderedIcon className="size-4" />
+            Numbered list
+          </MenuItem>
+          <MenuItem onClick={() => chain().toggleTaskList().run()}>
+            <ListTodoIcon className="size-4" />
+            Checklist
+          </MenuItem>
+        </MenuPopup>
+      </Menu>
+      <ToolbarDivider />
+      <ToolbarButton label="Link" active={state.link} onPress={() => setLinkDraft(state.href)}>
+        <LinkIcon className="size-4" />
+      </ToolbarButton>
     </div>
   );
 }
 
 function CommentComposer(props: {
   readonly placeholder: string;
-  readonly submitLabel: string;
+  readonly agentName: string | null;
+  readonly defaultSendToAgent: boolean;
   readonly autoFocus: boolean;
-  readonly onSubmit: (text: string) => void;
+  readonly onSubmit: (text: string, sendToAgent: boolean) => void;
   readonly onCancel?: () => void;
 }) {
   const [text, setText] = useState("");
+  const [sendToAgent, setSendToAgent] = useState(props.defaultSendToAgent);
   const submit = () => {
     const trimmed = text.trim();
     if (trimmed === "") return;
-    props.onSubmit(trimmed);
+    props.onSubmit(trimmed, sendToAgent && props.agentName !== null);
     setText("");
   };
   return (
@@ -258,18 +362,32 @@ function CommentComposer(props: {
           }
         }}
       />
-      {props.onCancel || text.trim() !== "" ? (
-        <div className="flex justify-end gap-1.5">
-          {props.onCancel ? (
-            <Button variant="ghost" size="xs" onClick={props.onCancel}>
-              Cancel
-            </Button>
-          ) : null}
-          <Button size="xs" disabled={text.trim() === ""} onClick={submit}>
-            {props.submitLabel}
+      <div className="flex items-center gap-2">
+        {props.agentName !== null ? (
+          <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+            <Checkbox
+              checked={sendToAgent}
+              onCheckedChange={(checked) => setSendToAgent(checked === true)}
+            />
+            Send to {props.agentName}
+          </label>
+        ) : (
+          <span className="flex-1" />
+        )}
+        {props.onCancel ? (
+          <Button variant="ghost" size="xs" onClick={props.onCancel}>
+            Cancel
           </Button>
-        </div>
-      ) : null}
+        ) : null}
+        <Button
+          size="icon-xs"
+          aria-label="Send comment"
+          disabled={text.trim() === ""}
+          onClick={submit}
+        >
+          <ArrowUpIcon />
+        </Button>
+      </div>
     </div>
   );
 }
@@ -295,14 +413,15 @@ function CommentEntry(props: {
 }
 
 function CommentCard(props: {
+  readonly ref: (element: HTMLDivElement | null) => void;
   readonly comment: MarkdownComment;
   readonly active: boolean;
   readonly anchored: boolean;
   readonly writable: boolean;
-  readonly ref: (element: HTMLDivElement | null) => void;
   readonly floating: boolean;
+  readonly agentName: string | null;
   readonly onActivate: () => void;
-  readonly onReply: (text: string) => void;
+  readonly onReply: (text: string, sendToAgent: boolean) => void;
   readonly onResolve: () => void;
 }) {
   const { comment, ref } = props;
@@ -311,7 +430,7 @@ function CommentCard(props: {
       ref={ref}
       data-markdown-comment={comment.id}
       className={cn(
-        "group/comment flex flex-col gap-3 rounded-2xl bg-card p-3 shadow-xs ring-1 ring-border/70 transition-[top,box-shadow] duration-200 ease-out",
+        "flex flex-col gap-3 rounded-2xl bg-popover p-3 shadow-xs ring-1 ring-border/70 transition-[top,box-shadow] duration-200 ease-out",
         props.floating && "absolute inset-x-0",
         props.active && "shadow-md ring-foreground/20",
       )}
@@ -363,8 +482,9 @@ function CommentCard(props: {
       ))}
       {props.active && props.writable ? (
         <CommentComposer
-          placeholder="Reply, or @Claude to ask the agent"
-          submitLabel="Reply"
+          placeholder="Reply"
+          agentName={props.agentName}
+          defaultSendToAgent={false}
           autoFocus={false}
           onSubmit={props.onReply}
         />
@@ -373,14 +493,15 @@ function CommentCard(props: {
   );
 }
 
-interface CommentDraft {
-  readonly quote: string;
+interface SelectionAnchor {
+  readonly top: number;
+  readonly bottom: number;
+  readonly left: number;
 }
 
-interface EditingBlock {
-  readonly index: number | "new";
-  readonly originalText: string;
-  readonly caret: number;
+interface CommentDraft {
+  readonly quote: string;
+  readonly anchor: SelectionAnchor;
 }
 
 export function MarkdownDocumentSurface(props: {
@@ -406,18 +527,19 @@ export function MarkdownDocumentSurface(props: {
     reportFailure: false,
   });
   const parsed = parseCommentedMarkdown(contents);
-  const blocks = splitMarkdownBlocks(parsed.body);
-  // An unreadable comments block would be lost on the next write, so it locks both.
+  // An unreadable comments block would be lost on the next write, so it locks the document.
   const editable = !props.readOnly && parsed.commentsWritable;
+  const agentName = threadShell
+    ? /claude/i.test(threadShell.providerInstanceId)
+      ? "Claude"
+      : "the agent"
+    : null;
 
-  const [editing, setEditing] = useState<EditingBlock | null>(null);
+  const [selectionAnchor, setSelectionAnchor] = useState<SelectionAnchor | null>(null);
   const [commentDraft, setCommentDraft] = useState<CommentDraft | null>(null);
-  const [selectionPrompt, setSelectionPrompt] = useState<{
-    readonly quote: string;
-    readonly top: number;
-  } | null>(null);
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
   const [marginLayout, setMarginLayout] = useState(false);
+  const [layoutWidth, setLayoutWidth] = useState(0);
   const [surfaceKey] = useState(() => ({}));
   const [anchoredIds, setAnchoredIds] = useState<ReadonlySet<string>>(new Set());
 
@@ -425,13 +547,11 @@ export function MarkdownDocumentSurface(props: {
   const layoutRef = useRef<HTMLDivElement>(null);
   const documentRef = useRef<HTMLDivElement>(null);
   const railRef = useRef<HTMLDivElement>(null);
-  const draftCardRef = useRef<HTMLDivElement | null>(null);
   const cardRefs = useRef(new Map<string, HTMLDivElement>());
   const rangesRef = useRef(new Map<string, Range>());
-
-  const lastSeparator = Math.max(relativePath.lastIndexOf("/"), relativePath.lastIndexOf("\\"));
-  const imageBaseDir =
-    lastSeparator >= 0 ? resolvePathLinkTarget(relativePath.slice(0, lastSeparator), cwd) : cwd;
+  /** The body the editor holds, so a file change that only echoes our own save is ignored. */
+  const editorBodyRef = useRef(parsed.body);
+  const saveTimerRef = useRef<number | null>(null);
 
   const currentContents = () =>
     getOptimisticProjectFileQueryData(environmentId, cwd, relativePath)?.contents ?? contents;
@@ -440,13 +560,6 @@ export function MarkdownDocumentSurface(props: {
     setProjectFileQueryData(environmentId, cwd, relativePath, next);
     saveCoordinator.change(next);
   };
-  const writeBody = (transform: (body: string) => string) => {
-    const current = parseCommentedMarkdown(currentContents());
-    if (!current.commentsWritable) return;
-    const body = transform(current.body);
-    const hadBlock = current.comments.length > 0 || current.body !== currentContents();
-    writeContents(hadBlock ? serializeCommentedMarkdown(body, current.comments) : body);
-  };
   const updateComments = (
     transform: (comments: ReadonlyArray<MarkdownComment>) => ReadonlyArray<MarkdownComment>,
   ) => {
@@ -454,6 +567,133 @@ export function MarkdownDocumentSurface(props: {
     if (!current.commentsWritable) return;
     writeContents(serializeCommentedMarkdown(current.body, transform(current.comments)));
   };
+
+  // Editor callbacks are registered once, at creation, so they read the editor through a ref.
+  const editorRef = useRef<Editor | null>(null);
+  const anchorFor = (from: number, to: number): SelectionAnchor | null => {
+    const current = editorRef.current;
+    const layout = layoutRef.current;
+    if (!current || !layout) return null;
+    const origin = layout.getBoundingClientRect();
+    const start = current.view.coordsAtPos(from);
+    const end = current.view.coordsAtPos(to);
+    return {
+      top: start.top - origin.top,
+      bottom: end.bottom - origin.top,
+      left: Math.max(0, start.left - origin.left),
+    };
+  };
+  const flushSave = useStableCallback(() => {
+    if (saveTimerRef.current !== null) {
+      window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    const current = editorRef.current;
+    if (!current || current.isDestroyed) return;
+    const body = current.getMarkdown();
+    const file = parseCommentedMarkdown(currentContents());
+    if (!file.commentsWritable) return;
+    editorBodyRef.current = body;
+    const hadBlock = file.comments.length > 0 || file.body !== currentContents();
+    writeContents(
+      hadBlock ? serializeCommentedMarkdown(body, file.comments) : `${body.trimEnd()}\n`,
+    );
+  });
+  const scheduleSave = useStableCallback(() => {
+    if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = window.setTimeout(flushSave, SAVE_DELAY_MS);
+  });
+  const readSelection = useStableCallback(() => {
+    const current = editorRef.current;
+    if (!current) return;
+    const { from, to, empty } = current.state.selection;
+    if (empty || !current.isFocused) {
+      setSelectionAnchor(null);
+      return;
+    }
+    setSelectionAnchor(anchorFor(from, to));
+  });
+  const startComment = useStableCallback(() => {
+    const current = editorRef.current;
+    if (!current || !editable) return;
+    const { from, to, empty } = current.state.selection;
+    if (empty) return;
+    const quote = normalizeCommentQuote(current.state.doc.textBetween(from, to, " ", " "));
+    const anchor = anchorFor(from, to);
+    if (quote === "" || !anchor) return;
+    setCommentDraft({ quote, anchor });
+    setActiveCommentId(null);
+    setSelectionAnchor(null);
+  });
+
+  const editor = useEditor(
+    {
+      extensions: markdownDocumentExtensions(),
+      content: parsed.body,
+      contentType: "markdown",
+      editable,
+      editorProps: {
+        attributes: {
+          class: "chat-markdown markdown-document-editor",
+          spellcheck: "true",
+          "aria-label": relativePath,
+        },
+        handleKeyDown: (_view, event) => {
+          if ((event.metaKey || event.ctrlKey) && event.altKey && event.code === "KeyM") {
+            event.preventDefault();
+            startComment();
+            return true;
+          }
+          return false;
+        },
+        handleClick: (_view, _position, event) => {
+          const link = (event.target as HTMLElement).closest("a[href]");
+          if (link && (event.metaKey || event.ctrlKey)) {
+            window.open(link.getAttribute("href") ?? "", "_blank", "noopener");
+            return true;
+          }
+          return false;
+        },
+      },
+      onCreate: ({ editor: created }) => {
+        editorRef.current = created;
+      },
+      onUpdate: () => scheduleSave(),
+      onSelectionUpdate: () => readSelection(),
+      onBlur: ({ event }) => {
+        // The toolbar and its menus take focus; only a blur elsewhere hides it.
+        const next = event.relatedTarget as HTMLElement | null;
+        if (next?.closest("[data-markdown-toolbar], [data-slot=menu-popup]")) return;
+        setSelectionAnchor(null);
+      },
+    },
+    [],
+  );
+  useLayoutEffect(() => {
+    editorRef.current = editor;
+  }, [editor]);
+
+  // Typing that has not reached its save yet is written before the surface goes.
+  useEffect(
+    () => () => {
+      if (saveTimerRef.current !== null) flushSave();
+    },
+    [flushSave],
+  );
+
+  // A change from elsewhere, such as an agent editing the file, replaces the
+  // editor's text unless it only echoes what the editor saved.
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+    if (parsed.body.trimEnd() === editorBodyRef.current.trimEnd()) return;
+    if (saveTimerRef.current !== null) return;
+    editorBodyRef.current = parsed.body;
+    editor.commands.setContent(parsed.body, { contentType: "markdown", emitUpdate: false });
+  }, [editor, parsed.body]);
+
+  useEffect(() => {
+    if (editor && !editor.isDestroyed) editor.setEditable(editable);
+  }, [editor, editable]);
 
   const askAgent = (comment: MarkdownComment, message: string) => {
     if (!threadShell) {
@@ -493,8 +733,9 @@ export function MarkdownDocumentSurface(props: {
     });
   };
 
-  const submitComment = (body: string) => {
+  const submitComment = (body: string, sendToAgent: boolean) => {
     if (!commentDraft) return;
+    flushSave();
     const comment: MarkdownComment = {
       id: nextMarkdownCommentId(),
       quote: commentDraft.quote,
@@ -506,44 +747,19 @@ export function MarkdownDocumentSurface(props: {
     updateComments((comments) => [...comments, comment]);
     setCommentDraft(null);
     setActiveCommentId(comment.id);
-    if (mentionsAgent(body)) askAgent(comment, body);
+    if (sendToAgent || mentionsAgent(body)) askAgent(comment, body);
   };
 
-  const replyToComment = (comment: MarkdownComment, body: string) => {
+  const replyToComment = (comment: MarkdownComment, body: string, sendToAgent: boolean) => {
+    flushSave();
     const reply = { author: USER_AUTHOR, body, createdAt: new Date().toISOString() };
     updateComments((comments) =>
       comments.map((entry) =>
         entry.id === comment.id ? { ...entry, replies: [...entry.replies, reply] } : entry,
       ),
     );
-    if (mentionsAgent(body)) askAgent(comment, body);
+    if (sendToAgent || mentionsAgent(body)) askAgent(comment, body);
   };
-
-  const finishEditing = (text: string) => {
-    const current = editing;
-    setEditing(null);
-    if (!current) return;
-    if (current.index === "new") {
-      writeBody((body) => appendMarkdownBlock(body, text));
-      return;
-    }
-    if (text === current.originalText) return;
-    const index = current.index;
-    writeBody((body) => {
-      const latest = splitMarkdownBlocks(body);
-      // The file can change while a block is open; find the block by its text first.
-      const target =
-        latest[index]?.text === current.originalText
-          ? latest[index]
-          : latest.find((block) => block.text === current.originalText);
-      return target ? replaceMarkdownBlock(body, target, text) : appendMarkdownBlock(body, text);
-    });
-  };
-
-  const toggleTask = useStableCallback(
-    ({ markerOffset, checked }: { readonly markerOffset: number; readonly checked: boolean }) =>
-      writeBody((body) => setMarkdownTaskChecked(body, markerOffset, checked)),
-  );
 
   const commentAtPoint = (x: number, y: number): string | null => {
     const caret = caretFromPoint(x, y);
@@ -558,71 +774,21 @@ export function MarkdownDocumentSurface(props: {
     return null;
   };
 
-  const handleDocumentClick = (event: ReactMouseEvent<HTMLDivElement>) => {
-    const target = event.target as HTMLElement;
-    if (target.closest("a, button, input, textarea, summary, video, img, [role=button]")) return;
-    const selection = window.getSelection();
-    if (selection && !selection.isCollapsed) return;
-    const commentId = commentAtPoint(event.clientX, event.clientY);
-    if (commentId !== null && commentId !== activeCommentId) {
-      setActiveCommentId(commentId);
-      cardRefs.current.get(commentId)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-      return;
-    }
-    if (!editable) return;
-    const blockElement = target.closest<HTMLElement>("[data-markdown-block]");
-    if (!blockElement) return;
-    const index = Number(blockElement.dataset.markdownBlock);
-    const block = blocks[index];
-    if (!block) return;
-    let caret = block.text.length;
-    const point = caretFromPoint(event.clientX, event.clientY);
-    if (point && blockElement.contains(point.node)) {
-      const prefix = document.createRange();
-      prefix.setStart(blockElement, 0);
-      prefix.setEnd(point.node, point.offset);
-      caret = sourceCaret(block.text, prefix.toString());
-    }
-    setActiveCommentId(null);
-    setEditing({ index, originalText: block.text, caret });
-  };
-
-  const readSelection = () => {
-    const root = documentRef.current;
-    const layout = layoutRef.current;
-    const selection = window.getSelection();
-    if (!root || !layout || !selection || selection.isCollapsed || selection.rangeCount === 0) {
-      setSelectionPrompt(null);
-      return;
-    }
-    const range = selection.getRangeAt(0);
-    if (!root.contains(range.commonAncestorContainer)) {
-      setSelectionPrompt(null);
-      return;
-    }
-    const quote = normalizeCommentQuote(selection.toString());
-    if (quote === "") {
-      setSelectionPrompt(null);
-      return;
-    }
-    const top = range.getBoundingClientRect().top - layout.getBoundingClientRect().top;
-    setSelectionPrompt({ quote, top });
-  };
-
-  useEffect(() => {
-    const onSelectionChange = () => {
-      if (window.getSelection()?.isCollapsed) setSelectionPrompt(null);
-    };
-    document.addEventListener("selectionchange", onSelectionChange);
-    return () => document.removeEventListener("selectionchange", onSelectionChange);
-  }, []);
-
   useEffect(() => {
     const element = scrollRef.current;
     if (!element) return;
     return observeResize(element, (entries) => {
       const entry = entries.at(-1);
       if (entry) setMarginLayout(entry.contentRect.width >= MARGIN_LAYOUT_MIN_WIDTH);
+    });
+  }, []);
+
+  useEffect(() => {
+    const element = layoutRef.current;
+    if (!element) return;
+    return observeResize(element, (entries) => {
+      const entry = entries.at(-1);
+      if (entry) setLayoutWidth(entry.contentRect.width);
     });
   }, []);
 
@@ -675,12 +841,6 @@ export function MarkdownDocumentSurface(props: {
         top: range ? range.getBoundingClientRect().top - railTop : Number.POSITIVE_INFINITY,
       });
     }
-    if (draftCardRef.current && commentDraft) {
-      placements.push({
-        element: draftCardRef.current,
-        top: draftRange ? draftRange.getBoundingClientRect().top - railTop : 0,
-      });
-    }
     placements.sort((left, right) => left.top - right.top);
     let bottom = 0;
     for (const placement of placements) {
@@ -699,7 +859,6 @@ export function MarkdownDocumentSurface(props: {
     const element = documentRef.current;
     if (!element) return;
     return observeResize(element, () => layoutComments());
-    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- The document element lives as long as the surface; layoutComments is stable.
   }, [layoutComments]);
 
   const setCardRef = (id: string) => (element: HTMLDivElement | null) => {
@@ -707,60 +866,35 @@ export function MarkdownDocumentSurface(props: {
     else cardRefs.current.delete(id);
   };
 
-  const comments = parsed.comments;
-  const cards = comments.map((comment) => (
+  const cards = parsed.comments.map((comment) => (
     <CommentCard
       key={comment.id}
+      ref={setCardRef(comment.id)}
       comment={comment}
       active={activeCommentId === comment.id}
       anchored={anchoredIds.has(comment.id)}
       writable={editable}
       floating={marginLayout}
-      ref={setCardRef(comment.id)}
+      agentName={agentName}
       onActivate={() => setActiveCommentId(comment.id)}
-      onReply={(text) => replyToComment(comment, text)}
+      onReply={(text, sendToAgent) => replyToComment(comment, text, sendToAgent)}
       onResolve={() => {
         updateComments((entries) => entries.filter((entry) => entry.id !== comment.id));
         if (activeCommentId === comment.id) setActiveCommentId(null);
       }}
     />
   ));
-  const draftCard = commentDraft ? (
-    <div
-      ref={draftCardRef}
-      className={cn(
-        "flex flex-col gap-2 rounded-2xl bg-card p-3 shadow-md ring-1 ring-foreground/20",
-        marginLayout && "absolute inset-x-0",
-      )}
-    >
-      <p className="line-clamp-2 border-s-2 border-warning/60 ps-2 text-xs leading-relaxed text-muted-foreground">
-        {commentDraft.quote}
-      </p>
-      <CommentComposer
-        placeholder={props.draft ? "Comment" : "Comment, or @Claude to ask the agent"}
-        submitLabel="Comment"
-        autoFocus
-        onSubmit={submitComment}
-        onCancel={() => setCommentDraft(null)}
-      />
-    </div>
-  ) : null;
 
-  const startComment = () => {
-    if (!selectionPrompt) return;
-    setCommentDraft({ quote: selectionPrompt.quote });
-    setActiveCommentId(null);
-    setSelectionPrompt(null);
-    window.getSelection()?.removeAllRanges();
-  };
+  const popoverLeft = (anchor: SelectionAnchor, width: number) =>
+    Math.max(8, Math.min(anchor.left, layoutWidth - width - 8));
 
   return (
     <ScrollArea ref={scrollRef} className="min-h-0 flex-1">
       <div
         ref={layoutRef}
         className={cn(
-          "relative mx-auto flex w-full gap-10 px-6 pt-10 pb-24 sm:px-10",
-          marginLayout ? "max-w-[64rem]" : "max-w-[46rem] flex-col",
+          "relative mx-auto flex w-full gap-12 px-6 pt-14 pb-32 sm:px-12",
+          marginLayout ? "max-w-[66rem]" : "max-w-[48rem] flex-col",
         )}
       >
         <div className="min-w-0 flex-1">
@@ -773,80 +907,62 @@ export function MarkdownDocumentSurface(props: {
           <div
             ref={documentRef}
             className="markdown-document"
-            data-editable={editable || undefined}
-            onClick={handleDocumentClick}
-            onMouseUp={readSelection}
-            onKeyUp={(event) => {
-              if (event.shiftKey) readSelection();
+            onClick={(event) => {
+              const id = commentAtPoint(event.clientX, event.clientY);
+              if (id !== null) setActiveCommentId(id);
             }}
           >
-            {blocks.map((block, index) =>
-              editing?.index === index ? (
-                <BlockEditor
-                  key={`edit:${block.start}`}
-                  initialText={block.text}
-                  initialCaret={editing.caret}
-                  onDone={finishEditing}
-                />
-              ) : (
-                <MarkdownBlockView
-                  key={`${block.start}:${block.text}`}
-                  index={index}
-                  text={block.text}
-                  start={block.start}
-                  cwd={cwd}
-                  imageBaseDir={imageBaseDir}
-                  threadRef={threadRef}
-                  onTaskListChange={editable ? toggleTask : undefined}
-                />
-              ),
-            )}
-            {editing?.index === "new" ? (
-              <BlockEditor
-                initialText=""
-                initialCaret={0}
-                placeholder="Write in markdown"
-                onDone={finishEditing}
-              />
-            ) : editable ? (
-              <button
-                type="button"
-                className="mt-4 block w-full cursor-text py-3 text-start text-sm text-muted-foreground/0 transition-colors hover:text-muted-foreground/70 focus-visible:text-muted-foreground/70 focus-visible:outline-none"
-                onClick={() => setEditing({ index: "new", originalText: "", caret: 0 })}
-              >
-                Click to write
-              </button>
-            ) : null}
+            <EditorContent editor={editor} />
           </div>
-          {!marginLayout && (draftCard || cards.length > 0) ? (
-            <section className="mt-12 flex flex-col gap-3">
+          {!marginLayout && cards.length > 0 ? (
+            <section className="mt-16 flex flex-col gap-3">
               <h2 className="text-xs font-medium text-muted-foreground">Comments</h2>
-              {draftCard}
               {cards}
             </section>
           ) : null}
         </div>
         {marginLayout ? (
-          <div ref={railRef} className="relative w-64 shrink-0">
-            {draftCard}
+          <div ref={railRef} className="relative w-72 shrink-0">
             {cards}
           </div>
         ) : null}
-        {selectionPrompt && editable && !commentDraft ? (
+
+        {selectionAnchor && editor && editable && !commentDraft ? (
           <div
-            className={cn("absolute right-6 z-10 sm:right-10", marginLayout && "w-64")}
-            style={{ top: selectionPrompt.top }}
+            data-markdown-toolbar
+            className="absolute z-20 rounded-xl bg-popover shadow-lg ring-1 ring-border"
+            style={{
+              top: Math.max(0, selectionAnchor.top - 48),
+              left: popoverLeft(selectionAnchor, TOOLBAR_WIDTH_PX),
+            }}
+            onMouseDown={(event) => {
+              if (!(event.target as HTMLElement).closest("input")) event.preventDefault();
+            }}
           >
-            <Button
-              variant="outline"
-              size="xs"
-              // Keeps the selection alive until the click lands.
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={startComment}
-            >
-              <MessageSquareIcon />
-              Comment
-            </Button>
+            <SelectionToolbar editor={editor} onComment={startComment} />
+          </div>
+        ) : null}
+
+        {commentDraft ? (
+          <div
+            className="absolute z-20 rounded-2xl bg-popover p-3 shadow-lg ring-1 ring-border"
+            style={{
+              top: commentDraft.anchor.bottom + 8,
+              left: popoverLeft(commentDraft.anchor, POPOVER_WIDTH_PX),
+              width: POPOVER_WIDTH_PX,
+            }}
+          >
+            <CommentComposer
+              placeholder={agentName ? `Comment, or ask ${agentName}` : "Comment"}
+              agentName={agentName}
+              defaultSendToAgent
+              autoFocus
+              onSubmit={submitComment}
+              onCancel={() => {
+                setCommentDraft(null);
+                editor?.commands.focus();
+              }}
+            />
           </div>
         ) : null}
       </div>

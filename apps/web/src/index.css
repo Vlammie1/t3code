@@ -2438,29 +2438,31 @@ body {
   ) !important;
 }
 
-/* Markdown files open as a document. Each block is its own markdown root, so
-   the spacing comes from the blocks' margins, which collapse across wrappers. */
+/* Markdown files open as a document: the editor reuses the chat's markdown
+   styles and sets a reading size with serif headings on top. */
 .markdown-document {
   --markdown-document-serif: ui-serif, "Iowan Old Style", Charter, "Source Serif 4", Georgia, serif;
 }
 
-.markdown-document .chat-markdown {
+.markdown-document .markdown-document-editor {
+  min-height: 12rem;
   font-size: 1rem;
   line-height: 1.7;
   color: var(--foreground);
+  outline: none;
 }
 
-.markdown-document .chat-markdown > * {
+.markdown-document .markdown-document-editor > * {
   margin-top: 0.9rem;
   margin-bottom: 0.9rem;
 }
 
-.markdown-document .chat-markdown > :is(h1, h2, h3, h4, h5, h6) {
+.markdown-document .markdown-document-editor > :is(h1, h2, h3, h4, h5, h6) {
   margin-top: 2.25rem;
   margin-bottom: 0.75rem;
 }
 
-.markdown-document > :first-child .chat-markdown > :first-child {
+.markdown-document .markdown-document-editor > :first-child {
   margin-top: 0;
 }
 
@@ -2494,18 +2496,62 @@ body {
   margin-top: 0.3rem;
 }
 
-/* Editable blocks show where a click lands without moving any text. */
-.markdown-document[data-editable] [data-markdown-block] {
-  cursor: text;
-  border-radius: 0.75rem;
-  transition:
-    background-color 150ms ease-out,
-    box-shadow 150ms ease-out;
+.markdown-document li > p {
+  margin: 0;
 }
 
-.markdown-document[data-editable] [data-markdown-block]:hover {
-  background-color: color-mix(in srgb, var(--foreground) 3%, transparent);
-  box-shadow: 0 0 0 0.5rem color-mix(in srgb, var(--foreground) 3%, transparent);
+.markdown-document ul[data-type="taskList"] {
+  padding-left: 0;
+  list-style: none;
+}
+
+.markdown-document ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.markdown-document ul[data-type="taskList"] li > label {
+  margin-top: 0.3rem;
+  flex: none;
+}
+
+.markdown-document ul[data-type="taskList"] li > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.markdown-document table {
+  font-size: 0.875rem;
+}
+
+.markdown-document th {
+  border-bottom: 1px solid color-mix(in srgb, var(--contrast-border) 60%, transparent);
+  font-weight: 600;
+}
+
+.markdown-document td {
+  border-bottom: 1px solid color-mix(in srgb, var(--contrast-border) 60%, transparent);
+}
+
+.markdown-document :is(th, td) > p {
+  margin: 0;
+}
+
+.markdown-document mark {
+  border-radius: 0.2em;
+  padding-inline: 0.1em;
+  color: inherit;
+  background-color: color-mix(in oklab, var(--warning) 30%, transparent);
+}
+
+.markdown-document hr {
+  margin-block: 2rem;
+  border-color: var(--border);
+}
+
+.markdown-document .ProseMirror-selectednode {
+  outline: 2px solid var(--ring);
 }
 
 ::highlight(t3-markdown-comment) {

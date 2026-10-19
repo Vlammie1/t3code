@@ -221,6 +221,7 @@ import { settleAndAdvance } from "../settleAndAdvance";
 import { subscribeSnapShotComposerFocus } from "../lib/desktopSnapShot";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { FileMetadataThreadProvider } from "../hooks/FileMetadataThreadProvider";
+import { isMarkdownPreviewFile } from "./files/filePreviewMode";
 import { usePreviewPanelInlineSize } from "../hooks/usePreviewPanelInlineSize";
 import {
   RIGHT_PANEL_INLINE_LAYOUT_MEDIA_QUERY,
@@ -641,6 +642,8 @@ function useDraftHeroLayoutTransition(
 }
 
 const EMPTY_PENDING_FILE_SURFACE_IDS: ReadonlySet<string> = new Set();
+// Wider than any panel may be, so the document fills up to the cap and leaves the chat its minimum.
+const DOCUMENT_PANEL_DEFAULT_WIDTH = 4000;
 type EnvironmentUnavailableState = {
   readonly environmentId: EnvironmentId;
   readonly label: string;
@@ -1594,10 +1597,6 @@ export default function ChatView(props: ChatViewProps) {
     activeThreadRef?.environmentId ?? null,
   );
   const browserAvailable = isPreviewSupportedInRuntime() || activeEnvironmentServerBrowser;
-  const previewPanelInlineSize = usePreviewPanelInlineSize(undefined, {
-    container: workspaceLayoutElement,
-    widthStorageKey: `t3code:preview-panel-width:${activeThreadKey}`,
-  });
   const activeThreadShell = useQuietThreadShell(isServerThread ? activeThreadRef : null);
   const timelineThreadError =
     serverRuntime?.status === "failed" &&
@@ -1654,6 +1653,19 @@ export default function ChatView(props: ChatViewProps) {
   const activeRightPanelSurface = useRightPanelStore((state) =>
     selectActiveRightPanelSurface(state.byThreadKey, activeThreadRef),
   );
+  // A markdown document is read and written like a page, so it takes the room and the
+  // chat stays beside it as a narrow column. Its width is remembered apart from other panels.
+  const documentPanelActive =
+    activeRightPanelSurface?.kind === "file" &&
+    activeRightPanelSurface.attachment === undefined &&
+    isMarkdownPreviewFile(activeRightPanelSurface.relativePath);
+  const previewPanelInlineSize = usePreviewPanelInlineSize(undefined, {
+    container: workspaceLayoutElement,
+    widthStorageKey: documentPanelActive
+      ? "t3code:document-panel-width"
+      : `t3code:preview-panel-width:${activeThreadKey}`,
+    ...(documentPanelActive ? { defaultWidth: DOCUMENT_PANEL_DEFAULT_WIDTH } : {}),
+  });
   const activePreviewState = useThreadPreviewState(activeThreadRef);
   const activePreviewServerEpoch = activePreviewState.serverEpoch;
   const previewSessionsReady = !activeEnvironmentServerBrowser || activePreviewState.listLoaded;
