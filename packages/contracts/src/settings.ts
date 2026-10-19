@@ -28,7 +28,7 @@ import {
   ProviderOptionSelections,
 } from "./model.ts";
 import { ModelSelection } from "./modelSelection.ts";
-import { ProjectScript, type ProjectMutation } from "./project.ts";
+import { ProjectBrief, ProjectScript, type ProjectMutation } from "./project.ts";
 import { DEFAULT_RUNTIME_MODE, RuntimeMode } from "./providerPolicy.ts";
 import { BrowserProfile, BrowserProfileId, DEFAULT_BROWSER_PROFILE_ID } from "./browserProfile.ts";
 import {
@@ -1094,6 +1094,14 @@ export const ServerSettings = Schema.Struct({
    * next server start.
    */
   projectSettingsFolded: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+  /**
+   * Kept beside the project row instead of in it, so a brief needs no table
+   * migration and reaches every client through the settings stream. Written
+   * only by ProjectBriefService, which also mirrors it into the project folder.
+   */
+  projectBriefs: Schema.Record(ProjectId, ProjectBrief).pipe(
+    Schema.withDecodingDefault(Effect.succeed({})),
+  ),
 
   enableAgentDeviceAccess: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   /**
@@ -1403,6 +1411,8 @@ export const ServerSettingsPatch = Schema.Struct({
    * the stored value instead of clearing it, so a client built before that
    * field existed cannot wipe it by editing another key.
    */
+  /** Per-project entry replacement; `null` removes the brief. */
+  projectBriefs: Schema.optionalKey(Schema.Record(ProjectId, Schema.NullOr(ProjectBrief))),
   projectSettingsOverrides: Schema.optionalKey(
     Schema.Record(ProjectId, Schema.NullOr(ProjectSettingsOverrides)),
   ),

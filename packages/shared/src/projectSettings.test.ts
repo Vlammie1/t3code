@@ -509,3 +509,23 @@ it("inherits branch naming defaults and applies project overrides independently"
   });
   expect(resolveProjectSettings(cleared, projectId).settings.branchNamingMode).toBe("static");
 });
+
+describe("projectBriefs patches", () => {
+  it("replaces one project's brief and removes it with null", () => {
+    const brief = { goal: "Ship v2", context: [], coordinatorThreadId: null };
+    const first = applyServerSettingsPatch(DEFAULT_SERVER_SETTINGS, {
+      projectBriefs: { [projectId]: brief, [otherProjectId]: { ...brief, goal: "Other" } },
+    });
+    const replaced = applyServerSettingsPatch(first, {
+      projectBriefs: {
+        [projectId]: { ...brief, context: [{ path: "/repos/api", kind: "directory" }] },
+      },
+    });
+    expect(replaced.projectBriefs[projectId]?.context).toEqual([
+      { path: "/repos/api", kind: "directory" },
+    ]);
+    expect(replaced.projectBriefs[otherProjectId]?.goal).toBe("Other");
+    const removed = applyServerSettingsPatch(replaced, { projectBriefs: { [projectId]: null } });
+    expect(Object.keys(removed.projectBriefs)).toEqual([otherProjectId]);
+  });
+});

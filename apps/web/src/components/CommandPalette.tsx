@@ -58,6 +58,7 @@ import {
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import {
   ArrowLeftIcon,
+  BriefcaseIcon,
   ChartNoAxesColumnIcon,
   CheckIcon,
   ChevronRightIcon,
@@ -571,6 +572,13 @@ export function CommandPalette({ children }: { children: ReactNode }) {
         event.stopPropagation();
         setOpen(false);
         void navigate({ to: "/usage" });
+        return;
+      }
+      if (command === "projects.open") {
+        event.preventDefault();
+        event.stopPropagation();
+        setOpen(false);
+        void navigate({ to: "/projects" });
         return;
       }
       const mode = overlayModeForCommand(command);
@@ -2026,6 +2034,18 @@ function OpenCommandPaletteDialog(props: {
       },
     });
   }
+
+  actionItems.push({
+    kind: "action",
+    value: "action:projects",
+    searchTerms: ["projects", "project", "coordinator", "goal", "context", "workspace"],
+    title: "Open projects",
+    icon: <BriefcaseIcon className={ITEM_ICON_CLASS} />,
+    shortcutCommand: "projects.open",
+    run: async () => {
+      await navigate({ to: "/projects" });
+    },
+  });
 
   actionItems.push({
     kind: "action",

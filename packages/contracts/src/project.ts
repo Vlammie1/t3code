@@ -10,6 +10,7 @@ import {
   NonNegativeInt,
   PositiveInt,
   ProjectId,
+  ThreadId,
   TrimmedNonEmptyString,
   TrimmedString,
   type UnknownUnionMember,
@@ -515,6 +516,56 @@ export const ProjectCreateNewResult = Schema.Struct({
   commitError: Schema.optionalKey(TrimmedNonEmptyString),
 });
 export type ProjectCreateNewResult = typeof ProjectCreateNewResult.Type;
+
+export const PROJECT_BRIEF_GOAL_MAX_LENGTH = 4000;
+export const PROJECT_BRIEF_CONTEXT_MAX_ENTRIES = 50;
+
+/** A folder, repository or file on the environment that agents in the project read from. */
+const ProjectContextPath = TrimmedNonEmptyString.check(Schema.isMaxLength(1024));
+export const ProjectContextEntry = Schema.Struct({
+  path: ProjectContextPath,
+  kind: ProjectEntryKind,
+});
+export type ProjectContextEntry = typeof ProjectContextEntry.Type;
+
+/**
+ * A project with a goal, context and a coordinator thread that starts and
+ * follows the project's other threads. Projects without a brief stay plain
+ * workspaces.
+ */
+export const ProjectBrief = Schema.Struct({
+  goal: TrimmedString.check(Schema.isMaxLength(PROJECT_BRIEF_GOAL_MAX_LENGTH)),
+  context: Schema.Array(ProjectContextEntry).check(
+    Schema.isMaxLength(PROJECT_BRIEF_CONTEXT_MAX_ENTRIES),
+  ),
+  coordinatorThreadId: Schema.NullOr(ThreadId),
+});
+export type ProjectBrief = typeof ProjectBrief.Type;
+
+export const ProjectCreateWithBriefInput = Schema.Struct({
+  name: TrimmedNonEmptyString.check(Schema.isMaxLength(200)),
+  projectIcon: Schema.NullOr(ProjectIconOverride),
+  goal: ProjectBrief.fields.goal,
+  /** Absolute paths; the server reads whether each is a file or a folder. */
+  contextPaths: Schema.Array(ProjectContextPath).check(
+    Schema.isMaxLength(PROJECT_BRIEF_CONTEXT_MAX_ENTRIES),
+  ),
+});
+export type ProjectCreateWithBriefInput = typeof ProjectCreateWithBriefInput.Type;
+
+export const ProjectCreateWithBriefResult = Schema.Struct({
+  projectId: ProjectId,
+  workspaceRoot: TrimmedNonEmptyString,
+  coordinatorThreadId: ThreadId,
+});
+export type ProjectCreateWithBriefResult = typeof ProjectCreateWithBriefResult.Type;
+
+export const ProjectUpdateBriefInput = Schema.Struct({
+  projectId: ProjectId,
+  goal: Schema.optionalKey(ProjectBrief.fields.goal),
+  contextPaths: Schema.optionalKey(ProjectCreateWithBriefInput.fields.contextPaths),
+});
+export type ProjectUpdateBriefInput = typeof ProjectUpdateBriefInput.Type;
 
 export class ProjectWriteFileError extends Schema.TaggedError<ProjectWriteFileError>()(
   "ProjectWriteFileError",

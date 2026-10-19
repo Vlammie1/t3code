@@ -200,6 +200,21 @@ export function createProjectEnvironmentAtoms<R, E>(
       scheduler: projectScheduler,
       concurrency: { mode: "serial", key: ({ environmentId }) => environmentId },
     }),
+    createWithBrief: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:projects:create-with-brief",
+      tag: WS_METHODS.projectsCreateWithBrief,
+      scheduler: projectScheduler,
+      concurrency: { mode: "serial", key: ({ environmentId }) => environmentId },
+    }),
+    updateBrief: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:projects:update-brief",
+      tag: WS_METHODS.projectsUpdateBrief,
+      scheduler: projectScheduler,
+      concurrency: {
+        mode: "serial",
+        key: ({ environmentId, input }) => `${environmentId}:${input.projectId}`,
+      },
+    }),
     writeFile: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:projects:write-file",
       tag: WS_METHODS.projectsWriteFile,

@@ -220,6 +220,10 @@ import {
 import {
   ProjectCreateNewInput,
   ProjectCreateNewResult,
+  ProjectBrief,
+  ProjectCreateWithBriefInput,
+  ProjectCreateWithBriefResult,
+  ProjectUpdateBriefInput,
   ProjectEnsureScratchResult,
   ProjectListEntriesError,
   ProjectListEntriesInput,
@@ -384,6 +388,8 @@ export const WS_METHODS = {
   projectsMutate: "projects.mutate",
   projectsEnsureScratch: "projects.ensureScratch",
   projectsCreateNew: "projects.createNew",
+  projectsCreateWithBrief: "projects.createWithBrief",
+  projectsUpdateBrief: "projects.updateBrief",
 
   shellOpenInEditor: "shell.openInEditor",
 
@@ -1239,6 +1245,18 @@ const WsProjectsCreateNewRpc = Rpc.make(WS_METHODS.projectsCreateNew, {
   error: Schema.Union([OrchestrationDispatchCommandError, EnvironmentAuthorizationError]),
 });
 
+const WsProjectsCreateWithBriefRpc = Rpc.make(WS_METHODS.projectsCreateWithBrief, {
+  payload: ProjectCreateWithBriefInput,
+  success: ProjectCreateWithBriefResult,
+  error: Schema.Union([OrchestrationDispatchCommandError, EnvironmentAuthorizationError]),
+});
+
+const WsProjectsUpdateBriefRpc = Rpc.make(WS_METHODS.projectsUpdateBrief, {
+  payload: ProjectUpdateBriefInput,
+  success: ProjectBrief,
+  error: Schema.Union([OrchestrationDispatchCommandError, EnvironmentAuthorizationError]),
+});
+
 const WsShellOpenInEditorRpc = Rpc.make(WS_METHODS.shellOpenInEditor, {
   payload: LaunchEditorInput,
   error: Schema.Union([ExternalLauncherError, EnvironmentAuthorizationError]),
@@ -1971,6 +1989,8 @@ export const WsRpcGroup = RpcGroup.make(
   WsProjectsSearchEntriesRpc,
   WsProjectsEnsureScratchRpc,
   WsProjectsCreateNewRpc,
+  WsProjectsCreateWithBriefRpc,
+  WsProjectsUpdateBriefRpc,
   WsProjectsWriteFileRpc,
   WsProjectsMutateRpc,
   WsShellOpenInEditorRpc,
