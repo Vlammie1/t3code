@@ -40,6 +40,31 @@ export function latestProviderTurnTokenUsage(
   return latest;
 }
 
+export interface PromptCacheWindow {
+  readonly refreshedAt: string;
+  readonly ttlMs: number;
+}
+
+/**
+ * Any request, a cache read included, renews the provider's prompt cache, so it lives from the
+ * newest usage report. Only turns that wrote to the cache report its TTL, so take the newest
+ * one that did.
+ */
+export function promptCacheWindow(
+  turns: ReadonlyArray<Pick<OrchestrationV2ProviderTurn, "tokenUsage">>,
+): PromptCacheWindow | null {
+  let ttl: { readonly ttlMs: number; readonly at: number } | null = null;
+  for (const { tokenUsage } of turns) {
+    if (tokenUsage?.promptCacheTtlMs === undefined) continue;
+    const at = Date.parse(tokenUsage.updatedAt);
+    if (ttl === null || at >= ttl.at) ttl = { ttlMs: tokenUsage.promptCacheTtlMs, at };
+  }
+  const latest = latestProviderTurnTokenUsage(turns);
+  return ttl === null || latest === null
+    ? null
+    : { refreshedAt: latest.updatedAt, ttlMs: ttl.ttlMs };
+}
+
 export function deriveLatestContextWindowSnapshot(
   entries: ReadonlyArray<{
     readonly item: OrchestrationV2TurnItem;

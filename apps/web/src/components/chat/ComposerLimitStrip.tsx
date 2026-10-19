@@ -11,6 +11,7 @@ import {
 } from "@t3tools/shared/usageLimits";
 
 import { useNowMinute } from "../../hooks/useNowMinute";
+import type { PromptCacheWindow } from "../../lib/contextWindow";
 import { cn } from "~/lib/utils";
 import { barColor } from "../usage/UsageLimits";
 import { ComposerBanner } from "./ComposerBanner";
@@ -92,27 +93,75 @@ function LimitSegment(props: {
   );
 }
 
+// Below this the cache is close enough to expiring that the next turn may write it again.
+const CACHE_LOW_SHARE = 0.1;
+
+function CacheSegment(props: {
+  readonly driver: ServerProvider["driver"];
+  readonly cache: PromptCacheWindow;
+  readonly now: number;
+}) {
+  const left = Math.max(0, Date.parse(props.cache.refreshedAt) + props.cache.ttlMs - props.now);
+  const share = Math.min(1, left / props.cache.ttlMs);
+  const color = share < CACHE_LOW_SHARE ? "var(--warning)" : barColor(props.driver);
+  const leftLabel = left === 0 ? "Expired" : formatDuration(left);
+  return (
+    <div
+      role="meter"
+      aria-label={`Prompt cache: ${left === 0 ? "expired" : `${leftLabel} left`}`}
+      aria-valuenow={Math.round(share * 100)}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      className="flex min-w-0 flex-col gap-1.5 px-2 py-1.5"
+    >
+      <span className="flex min-w-0 items-baseline gap-1.5 text-xs">
+        <span className="truncate text-muted-foreground">Cache</span>
+        <span className="ms-auto shrink-0 text-muted-foreground/70 tabular-nums">{leftLabel}</span>
+      </span>
+      <span className="relative block h-1 w-full rounded-full bg-foreground/8">
+        <span
+          className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-500 ease-out"
+          style={{ width: `${share * 100}%`, backgroundColor: color }}
+        />
+      </span>
+    </div>
+  );
+}
+
 /**
- * The selected provider's limit windows, attached to the top of the composer.
- * Each segment opens the full /usage-limits panel with pace and reset credits.
+ * The selected provider's session and weekly windows, attached to the top of the composer.
+ * Model-scoped weekly windows stay in the full /usage-limits panel, which each segment opens.
  */
 export function ComposerLimitStrip(props: {
   readonly report: UsageLimitsReport;
   readonly onOpen: () => void;
+  readonly promptCache: PromptCacheWindow | null;
 }) {
   const nowMinute = useNowMinute();
   // The minute tick is a UTC ISO prefix without its zone; parse it as UTC.
   const now = Date.parse(`${nowMinute}Z`);
   const accounts = props.report.accounts.filter((account) => limitsNotice(account.limits) === null);
   const segments = accounts.flatMap((account) =>
-    account.limits.windows.map((window) => ({
-      key: `${account.id}:${window.id}`,
-      driver: account.driver,
-      label: accounts.length > 1 ? `${account.label} · ${window.label}` : window.label,
-      window,
-    })),
+    // The first window of each kind is the account-wide one; later weekly ones are model-scoped.
+    (["session", "weekly"] as const)
+      .flatMap((kind) => {
+        const window = account.limits.windows.find((candidate) => candidate.kind === kind);
+        return window === undefined ? [] : [window];
+      })
+      .map((window) => ({
+        key: `${account.id}:${window.id}`,
+        driver: account.driver,
+        label: accounts.length > 1 ? `${account.label} · ${window.label}` : window.label,
+        window,
+      })),
   );
-  if (segments.length === 0) return null;
+  const cacheDriver = accounts[0]?.driver;
+  const cache =
+    props.promptCache === null || cacheDriver === undefined
+      ? null
+      : { driver: cacheDriver, window: props.promptCache };
+  if (segments.length === 0 && cache === null) return null;
+  const columns = Math.min(segments.length + (cache === null ? 0 : 1), 4);
 
   return (
     <ComposerBanner.Attachment data-chat-composer-limit-strip="true">
@@ -120,7 +169,7 @@ export function ComposerLimitStrip(props: {
         <div
           className="grid gap-1 px-1"
           style={{
-            gridTemplateColumns: `repeat(${Math.min(segments.length, 4)}, minmax(0, 1fr))`,
+            gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
           }}
         >
           {segments.map((segment) => (
@@ -133,6 +182,9 @@ export function ComposerLimitStrip(props: {
               onOpen={props.onOpen}
             />
           ))}
+          {cache === null ? null : (
+            <CacheSegment driver={cache.driver} cache={cache.window} now={now} />
+          )}
         </div>
       </ComposerBanner.Root>
     </ComposerBanner.Attachment>

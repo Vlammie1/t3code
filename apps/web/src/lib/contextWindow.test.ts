@@ -4,6 +4,7 @@ import {
   deriveLatestContextWindowSnapshot,
   formatContextWindowTokens,
   latestProviderTurnTokenUsage,
+  promptCacheWindow,
 } from "./contextWindow";
 
 describe("V2 context window presentation", () => {
@@ -107,5 +108,30 @@ describe("latestProviderTurnTokenUsage", () => {
       usage(90_000, "2026-06-20T09:00:00.000Z"),
     ]);
     expect(latest?.usedTokens).toBe(300_000);
+  });
+});
+
+describe("promptCacheWindow", () => {
+  it("lives from the newest report and keeps the TTL of the last cache write", () => {
+    const window = promptCacheWindow([
+      {
+        tokenUsage: {
+          usedTokens: 10,
+          updatedAt: "2026-06-20T09:00:00.000Z",
+          promptCacheTtlMs: 3_600_000,
+        },
+      },
+      // A turn that only read the cache reports no TTL, yet still renews it.
+      { tokenUsage: { usedTokens: 20, updatedAt: "2026-06-20T10:00:00.000Z" } },
+    ]);
+    expect(window).toEqual({ refreshedAt: "2026-06-20T10:00:00.000Z", ttlMs: 3_600_000 });
+  });
+
+  it("is unknown until a turn reported a TTL", () => {
+    expect(
+      promptCacheWindow([
+        { tokenUsage: { usedTokens: 10, updatedAt: "2026-06-20T09:00:00.000Z" } },
+      ]),
+    ).toBeNull();
   });
 });

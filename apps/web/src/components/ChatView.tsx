@@ -466,6 +466,7 @@ import {
 import {
   deriveLatestContextWindowSnapshot,
   latestProviderTurnTokenUsage,
+  promptCacheWindow,
 } from "../lib/contextWindow";
 import {
   DRAFT_HERO_TRANSITION_ANIMATION_ID,
@@ -2541,6 +2542,11 @@ export default function ChatView(props: ChatViewProps) {
       (thread) => thread.id === serverProjection.thread.activeProviderThreadId,
     ),
   );
+  // Only Claude reports a cache TTL, and it describes the thread's own provider session.
+  const composerPromptCache =
+    selectedProvider === "claudeAgent"
+      ? promptCacheWindow(serverProjection?.providerTurns ?? [])
+      : null;
   const pendingBackgroundTasks = (() => {
     if (serverProjection === null || serverProjection === undefined) {
       return [];
@@ -8259,6 +8265,7 @@ export default function ChatView(props: ChatViewProps) {
                                   <ComposerLimitStrip
                                     report={usageLimitsLiveReport}
                                     onOpen={() => void openUsageLimits()}
+                                    promptCache={composerPromptCache}
                                   />
                                 ) : null
                               }
