@@ -4,6 +4,7 @@ import {
 } from "@t3tools/client-runtime/connection";
 import { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { ConnectionCatalogDocument, Persistence } from "@t3tools/client-runtime/platform";
+import { EnvironmentQueryStore } from "@t3tools/client-runtime/state/query-persistence";
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Deferred from "effect/Deferred";
@@ -176,6 +177,81 @@ describe("environment cache removal", () => {
       expect(threadError.message).toContain("Commit aborted");
       expect(refsError.message).toContain("Commit aborted");
       expect(database.close).toHaveBeenCalledOnce();
+    }),
+  );
+});
+
+describe("offline query cache", () => {
+  it.effect("returns a saved answer to its own environment until that environment is cleared", () =>
+    Effect.gen(function* () {
+      vi.stubGlobal("window", {});
+      vi.stubGlobal("IDBKeyRange", {
+        bound: (lower: string, upper: string) => ({
+          includes: (key: string) => key >= lower && key <= upper,
+        }),
+      });
+      const stores = new Map<string, Map<string, unknown>>();
+      const storeOf = (name: string) => {
+        let store = stores.get(name);
+        if (store === undefined) stores.set(name, (store = new Map()));
+        return store;
+      };
+      const database = Object.assign(new EventTarget(), {
+        transaction: (name: string) => {
+          const transaction = new EventTarget();
+          const complete = () =>
+            queueMicrotask(() => transaction.dispatchEvent(new Event("complete")));
+          const store = storeOf(name);
+          return Object.assign(transaction, {
+            objectStore: () => ({
+              get: (key: string) => {
+                const request = Object.assign(new EventTarget(), { result: store.get(key) });
+                queueMicrotask(() => request.dispatchEvent(new Event("success")));
+                return request;
+              },
+              put: (value: unknown, key: string) => {
+                store.set(key, value);
+                complete();
+              },
+              delete: (key: string) => {
+                store.delete(key);
+                complete();
+              },
+              openCursor: (range: { includes: (key: string) => boolean }) => {
+                for (const key of store.keys()) if (range.includes(key)) store.delete(key);
+                const request = Object.assign(new EventTarget(), { result: null });
+                queueMicrotask(() => request.dispatchEvent(new Event("success")));
+                complete();
+                return request;
+              },
+            }),
+          });
+        },
+        close: vi.fn(),
+      }) as unknown as IDBDatabase;
+      const openRequest = Object.assign(new EventTarget(), { result: database, error: null });
+      vi.stubGlobal("indexedDB", {
+        open: () => {
+          queueMicrotask(() => openRequest.dispatchEvent(new Event("success")));
+          return openRequest;
+        },
+      });
+      const environment = EnvironmentId.make("env");
+      const other = EnvironmentId.make("env-other");
+
+      const [loaded, elsewhere, afterClear] = yield* Effect.gen(function* () {
+        const queries = yield* EnvironmentQueryStore;
+        const cache = yield* Persistence.EnvironmentCacheStore;
+        yield* queries!.save(environment, "usage", '{"cost":1}');
+        const loaded = yield* queries!.load(environment, "usage");
+        const elsewhere = yield* queries!.load(other, "usage");
+        yield* cache.clear(environment).pipe(Effect.ignore);
+        return [loaded, elsewhere, yield* queries!.load(environment, "usage")] as const;
+      }).pipe(Effect.provide(ConnectionStorage.layer));
+
+      expect(loaded).toEqual(Option.some('{"cost":1}'));
+      expect(Option.isNone(elsewhere)).toBe(true);
+      expect(Option.isNone(afterClear)).toBe(true);
     }),
   );
 });

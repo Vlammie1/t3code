@@ -18,6 +18,7 @@ import {
   makeStoredShellSnapshotEncoder,
 } from "@t3tools/client-runtime/platform";
 import { TokenStore } from "@t3tools/client-runtime/authorization";
+import { EnvironmentQueryStore } from "@t3tools/client-runtime/state/query-persistence";
 import {
   ConnectionTransientError,
   ConnectionBlockedError,
@@ -41,12 +42,14 @@ import * as Stream from "effect/Stream";
 import { projectFaviconCache } from "../assets/projectFaviconCache";
 
 const DATABASE_NAME = "t3code:connection-runtime";
-const DATABASE_VERSION = 4;
+const DATABASE_VERSION = 5;
 const CATALOG_STORE_NAME = "catalog";
 const SHELL_STORE_NAME = "shell";
 const THREAD_STORE_NAME = "thread";
 const SERVER_CONFIG_STORE_NAME = "server-config";
 const VCS_REFS_STORE_NAME = "vcs-refs";
+// Last answers of slow reads (pull requests, usage), painted at once while they revalidate.
+const QUERY_STORE_NAME = "query";
 const CATALOG_KEY = "document";
 const StoredShellSnapshot = StoredOrchestrationShellSnapshot;
 const StoredShellSnapshotJson = Schema.fromJsonString(StoredShellSnapshot);
@@ -136,6 +139,9 @@ const openDatabase = Effect.fn("web.connectionStorage.openDatabase")(function* (
         }
         if (!request.result.objectStoreNames.contains(VCS_REFS_STORE_NAME)) {
           request.result.createObjectStore(VCS_REFS_STORE_NAME);
+        }
+        if (!request.result.objectStoreNames.contains(QUERY_STORE_NAME)) {
+          request.result.createObjectStore(QUERY_STORE_NAME);
         }
       });
       request.addEventListener("error", () => {
@@ -368,6 +374,10 @@ function threadCacheKey(environmentId: EnvironmentId, threadId: ThreadId) {
 
 function vcsRefsCacheKey(environmentId: EnvironmentId, cwd: string) {
   return `${environmentId}:${cwd}`;
+}
+
+function queryCacheKey(environmentId: EnvironmentId, key: string) {
+  return `${environmentId}:v1:${key}`;
 }
 
 const decodeCatalog = Effect.fn("web.connectionStorage.decodeCatalog")(function* (raw: string) {
@@ -924,12 +934,32 @@ export const layer = Layer.effectContext(
               VCS_REFS_STORE_NAME,
               IDBKeyRange.bound(`${environmentId}:`, `${environmentId}:\uffff`),
             ),
+            removeDatabaseValuesInRange(
+              database,
+              QUERY_STORE_NAME,
+              IDBKeyRange.bound(`${environmentId}:`, `${environmentId}:\uffff`),
+            ),
           ],
           { concurrency: "unbounded", discard: true },
         ).pipe(Effect.mapError((cause) => persistenceError("clear-environment", cause))),
     });
 
+    const queryStore: NonNullable<typeof EnvironmentQueryStore.Service> = {
+      load: (environmentId, key) =>
+        readDatabaseValue(database, QUERY_STORE_NAME, queryCacheKey(environmentId, key)).pipe(
+          Effect.map((raw) => (typeof raw === "string" ? Option.some(raw) : Option.none())),
+          Effect.catch(() => Effect.succeedNone),
+        ),
+      save: (environmentId, key, payload) =>
+        writeDatabaseValue(
+          database,
+          QUERY_STORE_NAME,
+          queryCacheKey(environmentId, key),
+          payload,
+        ).pipe(Effect.catch(() => Effect.logWarning("Offline query cache save failed"))),
+    };
     return Context.make(Persistence.ConnectionTargetStore, targetStore).pipe(
+      Context.add(EnvironmentQueryStore, queryStore),
       Context.add(GitHubRoutingPermissions, githubRoutingPermissions),
       Context.add(Persistence.ConnectionRegistrationStore, registrationStore),
       Context.add(ProfileStore.ConnectionProfileStore, profileStore),
