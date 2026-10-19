@@ -91,6 +91,8 @@ import { UsagePriceOverrides } from "./UsagePriceOverrides";
 import { UsageProviderChart } from "./UsageProviderChart";
 import { SpeedPremium, UsageModelDialog } from "./UsageModelDialog";
 import { UsageShareBar } from "./UsageShareBar";
+import { UsageActivityHeatmap, UsageActivityLegend } from "./UsageActivityHeatmap";
+import { usageActivity, type UsageActivity } from "./usageActivity";
 import {
   costTypeSegments,
   modelShare,
@@ -119,6 +121,9 @@ function isUsageMetric(value: string | null | undefined): value is UsageMetric {
 function isUsageWindowDays(value: number): value is UsagePagePreferences["windowDays"] {
   return WINDOW_OPTIONS.some((option) => option.days === value);
 }
+
+/** The heatmap spans what the server keeps parsed (92 days), so it never forces a re-read of older transcripts. */
+const ACTIVITY_DAYS = 90;
 
 const providerLabel = (provider: UsageProviderKind) => PROVIDER_PRESENTATION[provider].label;
 
@@ -211,6 +216,9 @@ export function UsagePage() {
     useState<ReadonlySet<EnvironmentId> | null>(null);
   const hiddenProviders = new Set(preferences.hiddenProviders);
   const { days: windowDays, window } = windowSelection;
+  // Held in state: useUsage compares its window by identity.
+  const [activityWindow, setActivityWindow] = useState(() => makeWindow(ACTIVITY_DAYS));
+  const activityUsage = useUsage(activityWindow, selectedEnvironmentIds, hiddenProviders);
   const isPast24Hours = windowDays === 1;
   const {
     merged: answeredUsage,
@@ -322,6 +330,12 @@ export function UsagePage() {
     ) {
       setWindowSelection({ days: windowDays, window: nextWindow });
     }
+    const nextActivityWindow = makeWindow(ACTIVITY_DAYS);
+    if (nextActivityWindow.untilDay !== activityWindow.untilDay) {
+      setActivityWindow(nextActivityWindow);
+    }
+    // At 90 days both read the same query, so one refresh covers both.
+    if (windowDays !== ACTIVITY_DAYS) void activityUsage.refresh(nextActivityWindow);
     refreshingRef.current = true;
     setIsRefreshing(true);
     void refresh(nextWindow).finally(() => {
@@ -565,6 +579,8 @@ export function UsagePage() {
                   void refreshLimits(false, true);
                 }}
                 onSelectModel={selectUsageModel}
+                activityDays={enumerateDays(activityWindow.sinceDay, activityWindow.untilDay)}
+                activityDaily={activityUsage.shown?.merged.daily ?? null}
               />
             )}
           </WorkspacePageContainer>
@@ -613,6 +629,8 @@ function UsageOverview({
   showChatGptSharing,
   onCursorEnabled,
   onSelectModel,
+  activityDays,
+  activityDaily,
 }: {
   readonly merged: MergedUsage;
   readonly shownWindow: UsageSummaryInput;
@@ -627,6 +645,8 @@ function UsageOverview({
   readonly showChatGptSharing: boolean;
   readonly onCursorEnabled: () => void;
   readonly onSelectModel: (key: string) => void;
+  readonly activityDays: readonly string[];
+  readonly activityDaily: readonly DailyTotals[] | null;
 }) {
   const [breakdown, setBreakdown] = useState<"model" | "time">("model");
   const shownHourly = shownWindow.resolution === "hour";
@@ -865,6 +885,10 @@ function UsageOverview({
           />
         </div>
       </section>
+
+      {activityDaily === null ? null : (
+        <UsageActivitySection activity={usageActivity(activityDays, activityDaily)} />
+      )}
 
       {merged.totalTokens > 0 ? (
         <section
@@ -1215,6 +1239,29 @@ function ProviderMark({
       displayName={presentation.label}
       iconClassName={className}
     />
+  );
+}
+
+function UsageActivitySection({ activity }: { readonly activity: UsageActivity }) {
+  const days = (count: number) => `${formatCount(count)} ${count === 1 ? "day" : "days"}`;
+  return (
+    <section className="flex flex-col gap-3">
+      <div className="flex items-baseline justify-between gap-4">
+        <h2 className="text-sm font-medium text-foreground">Activity</h2>
+        <UsageActivityLegend />
+      </div>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+        <div className="grid grid-cols-3 gap-x-6 gap-y-4 py-1 lg:grid-cols-1">
+          <Metric loading={false} label="Streak" value={days(activity.currentStreak)} />
+          <Metric loading={false} label="Longest streak" value={days(activity.longestStreak)} />
+          <Metric loading={false} label="Active days" value={days(activity.activeDays)} />
+        </div>
+        <div className="flex flex-wrap gap-x-12 gap-y-6">
+          <UsageActivityHeatmap activity={activity} metric="tokens" label="Tokens" />
+          <UsageActivityHeatmap activity={activity} metric="cost" label="Cost" />
+        </div>
+      </div>
+    </section>
   );
 }
 
