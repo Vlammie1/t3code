@@ -62,11 +62,13 @@ import {
   ChartNoAxesColumnIcon,
   CheckIcon,
   ChevronRightIcon,
+  CloudUploadIcon,
   CornerLeftUpIcon,
   FileSearchIcon,
   FolderGit2Icon,
   FolderIcon,
   FolderPlusIcon,
+  LaptopIcon,
   LinkIcon,
   MessageSquareDashedIcon,
   MessageSquareIcon,
@@ -80,6 +82,7 @@ import {
   TextSearchIcon,
 } from "~/components/appIcons";
 import { requestThreadFindOpen } from "./chat/threadFindActionBus";
+import { moveToastTitle, useRoerThread } from "../state/roer";
 import {
   useDeferredValue,
   useEffect,
@@ -769,6 +772,7 @@ function OpenCommandPaletteDialog(props: {
   const activeThreadServerConfig = useServerConfigs().get(
     activeThread?.environmentId ?? ("" as EnvironmentId),
   );
+  const roer = useRoerThread(activeThread?.environmentId ?? null, activeThread?.id ?? null);
   const activeThreadReferenceCopyTarget =
     referenceThreadRef === null || (pathname === "/pull-requests" && !openPanelPullRequestUrl)
       ? null
@@ -1699,6 +1703,26 @@ function OpenCommandPaletteDialog(props: {
         });
       }
     }
+  }
+
+  if (roer.configured && roer.location !== null) {
+    const to = roer.location === "cloud" ? "local" : "cloud";
+    actionItems.push({
+      kind: "action",
+      value: "action:roer-move-thread",
+      searchTerms: ["roer", "cloud", "laptop", "move", "worker", "close laptop", "bring back"],
+      title: to === "cloud" ? "Move thread to cloud" : "Bring thread back to this machine",
+      icon:
+        to === "cloud" ? (
+          <CloudUploadIcon className={ITEM_ICON_CLASS} />
+        ) : (
+          <LaptopIcon className={ITEM_ICON_CLASS} />
+        ),
+      disabled: roer.moving,
+      run: async () => {
+        if (await roer.move(to)) toastManager.add({ type: "success", title: moveToastTitle(to) });
+      },
+    });
   }
 
   if (activeThreadReferenceCopyTarget !== null) {

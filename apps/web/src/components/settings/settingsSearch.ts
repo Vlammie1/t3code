@@ -666,6 +666,13 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["allow disable enable open drive preview tools sessions project override"],
   },
   {
+    id: "roer",
+    title: "Roer",
+    to: "/settings/integrations",
+    targetId: "roer",
+    searchTerms: ["cloud worker move thread laptop mate token url"],
+  },
+  {
     id: "device-hosts",
     title: "Device hosts",
     to: "/settings/integrations",

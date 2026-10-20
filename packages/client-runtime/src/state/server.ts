@@ -1335,6 +1335,19 @@ export function createServerEnvironmentAtoms<R, E>(
       label: "environment-data:server:check-otlp-endpoint",
       tag: WS_METHODS.serverCheckOtlpEndpoint,
     }),
+    roerThreadPlacement: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:roer-thread-placement",
+      tag: WS_METHODS.roerThreadPlacement,
+    }),
+    roerMoveThread: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:roer-move-thread",
+      tag: WS_METHODS.roerMoveThread,
+      // One move per thread at a time: a second click while packing would race the first.
+      concurrency: {
+        mode: "singleFlight",
+        key: ({ environmentId, input }) => `${environmentId}:${input.threadId}`,
+      },
+    }),
     retryResourceTelemetry: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:server:retry-resource-telemetry",
       tag: WS_METHODS.serverRetryResourceTelemetry,

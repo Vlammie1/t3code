@@ -3,6 +3,7 @@ import {
   ClaudeSettings,
   CodexSettings,
   type ServerSettings,
+  RoerSettings,
   UsageLimitSourceConfig,
   secretSettingsFields,
 } from "@t3tools/contracts";
@@ -31,6 +32,7 @@ const providerSecretFields = new Map([
   ),
 ]);
 const usageLimitSecretFields = secretSettingsFields(UsageLimitSourceConfig);
+const roerSecretFields = secretSettingsFields(RoerSettings);
 const encode = (value: string) => Buffer.from(value, "utf8").toString("base64url");
 
 export interface SettingsSecret {
@@ -142,5 +144,12 @@ export function mapSettingsSecrets(
     ]),
   ) as ServerSettings["usageLimitSources"];
 
-  return { ...settings, providerInstances, sourceControlHosts, usageLimitSources };
+  const roer = mapFields(
+    settings.roer,
+    roerSecretFields,
+    (field, serverHost) =>
+      `roer-${encode(field)}${serverHost === null ? "" : `-${encode(serverHost)}`}`,
+  ) as ServerSettings["roer"];
+
+  return { ...settings, providerInstances, sourceControlHosts, usageLimitSources, roer };
 }

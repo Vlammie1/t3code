@@ -13,7 +13,8 @@ import { discardComposerDraft } from "../lib/discardComposerDraft";
 import { requestCustomSnooze } from "./CustomSnoozeDialog";
 import { useSupportsMultiplePullRequests } from "~/hooks/useSupportsMultiplePullRequests";
 import { resolveThreadCurrentPullRequestLink } from "@t3tools/shared/threadPullRequests";
-import { useAtomValue } from "@effect/atom-react";
+import { RegistryContext, useAtomValue } from "@effect/atom-react";
+import { moveRoerThread, moveToastTitle, readRoerThread } from "../state/roer";
 import * as Option from "effect/Option";
 import { Atom } from "effect/reactivity";
 import { replaceComposerContextReferences } from "@t3tools/shared/composerContextReferences";
@@ -93,6 +94,7 @@ import {
 } from "~/components/appIcons";
 import {
   memo,
+  useContext,
   useEffect,
   useLayoutEffect,
   useReducer,
@@ -4357,6 +4359,7 @@ export default function Sidebar() {
     },
   );
 
+  const atomRegistry = useContext(RegistryContext);
   const handleThreadContextMenu = useStableCallback(
     (threadRef: ScopedThreadRef, position: { x: number; y: number }) => {
       void (async () => {
@@ -4429,6 +4432,10 @@ export default function Sidebar() {
                 titleRegeneration: supportsTitleRegeneration,
               },
               snoozePresets,
+              cloud: (() => {
+                const roer = readRoerThread(atomRegistry, threadRef);
+                return roer.configured ? { location: roer.location, moving: roer.moving } : null;
+              })(),
             }),
             position,
           ),
@@ -4511,6 +4518,14 @@ export default function Sidebar() {
                   description: error instanceof Error ? error.message : "An error occurred.",
                 }),
               );
+            }
+            return;
+          }
+          case "move-to-cloud":
+          case "move-to-local": {
+            const to = clicked.value === "move-to-cloud" ? "cloud" : "local";
+            if (await moveRoerThread(atomRegistry, threadRef, to)) {
+              toastManager.add(stackedThreadToast({ type: "success", title: moveToastTitle(to) }));
             }
             return;
           }

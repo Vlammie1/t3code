@@ -770,6 +770,16 @@ export const ObservabilitySettings = Schema.Struct({
 });
 export type ObservabilitySettings = typeof ObservabilitySettings.Type;
 
+/**
+ * Roer runs a thread on a cloud worker while the laptop is closed and hands it back after. This environment talks to
+ * it with a base URL and a bearer token; both empty means the integration is off.
+ */
+export const RoerSettings = Schema.Struct({
+  url: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
+  token: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed("")), secretSetting),
+});
+export type RoerSettings = typeof RoerSettings.Type;
+
 export const SourceControlWritingStyleMode = Schema.Literals([
   "repo_conventions",
   "conventional_commits",
@@ -1208,6 +1218,7 @@ export const ServerSettings = Schema.Struct({
     Schema.withDecodingDefault(Effect.succeed({})),
   ),
   observability: ObservabilitySettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
+  roer: RoerSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
   sourceControlHosts: Schema.Record(Schema.String, SourceControlHostSettings).pipe(
     Schema.withDecodingDefault(Effect.succeed({})),
   ),
@@ -1463,6 +1474,12 @@ export const ServerSettingsPatch = Schema.Struct({
       otlpTracesUrl: Schema.optionalKey(TrimmedString),
       otlpMetricsUrl: Schema.optionalKey(TrimmedString),
       otlpLogsUrl: Schema.optionalKey(TrimmedString),
+    }),
+  ),
+  roer: Schema.optionalKey(
+    Schema.Struct({
+      url: Schema.optionalKey(TrimmedString),
+      token: Schema.optionalKey(TrimmedString),
     }),
   ),
   /**

@@ -15,6 +15,8 @@ export type ThreadActionMenuId =
   | "snooze"
   | `snooze:${string}`
   | "unsnooze"
+  | "move-to-cloud"
+  | "move-to-local"
   | "rename"
   | "regenerate-title"
   | "mark-unread"
@@ -86,6 +88,8 @@ export interface ThreadActionMenuState {
     readonly titleRegeneration: boolean;
   };
   readonly snoozePresets: ReadonlyArray<SnoozePreset>;
+  /** Null when the environment has no Roer link; `location` is null until Roer has answered. */
+  readonly cloud: { readonly location: "local" | "cloud" | null; readonly moving: boolean } | null;
 }
 
 /** Local navigation, read markers, and copying remain available to read-only clients. */
@@ -144,6 +148,23 @@ export function buildThreadActionMenuItems(
                   })),
                   { id: "snooze:custom" as const, label: "Custom…", separatorBefore: true },
                 ],
+              },
+        ]
+      : []),
+    ...(state.cloud
+      ? [
+          state.cloud.location === "cloud"
+            ? {
+                id: "move-to-local" as const,
+                label: state.cloud.moving ? "Moving…" : "Bring back to this machine",
+                icon: "laptop",
+                disabled: state.cloud.moving,
+              }
+            : {
+                id: "move-to-cloud" as const,
+                label: state.cloud.moving ? "Moving…" : "Move to cloud",
+                icon: "cloud-upload",
+                disabled: state.cloud.moving,
               },
         ]
       : []),

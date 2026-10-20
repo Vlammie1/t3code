@@ -106,6 +106,20 @@ describe("command permissions", () => {
     ),
   );
 
+  it.effect("requires the destination operate grant to move a thread to the cloud", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const registry = yield* setup;
+        const move = createCommandPermissions(runtime, WS_METHODS.roerMoveThread);
+        registry.set(sessions(env), AsyncResult.success(grant(false)));
+        expect(registry.get(move.permissionAtom(env))).toBe(false);
+        registry.set(sessions(env), AsyncResult.success(grant(true)));
+        expect(registry.get(move.permissionAtom(env))).toBe(true);
+        yield* move.authorize(registry, env);
+      }),
+    ),
+  );
+
   it.effect("uses the target grant for both availability and execution", () =>
     Effect.scoped(
       Effect.gen(function* () {

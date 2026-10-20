@@ -46,6 +46,7 @@ import { useCopyToClipboard } from "./useCopyToClipboard";
 import { useNewThreadHandler } from "./useHandleNewThread";
 import { useClientSettings } from "./useSettings";
 import { useThreadActions } from "./useThreadActions";
+import { moveToastTitle, useRoerThread } from "../state/roer";
 
 function failureToast(title: string, error: unknown) {
   toastManager.add(
@@ -88,6 +89,7 @@ export function useThreadActionMenu(input: {
     reportFailure: false,
   });
   const handleNewThread = useNewThreadHandler();
+  const roer = useRoerThread(threadRef?.environmentId ?? null, threadRef?.threadId ?? null);
   const confirmThreadDelete = useClientSettings((s) => s.confirmThreadDelete);
   const confirmThreadArchive = useClientSettings((s) => s.confirmThreadArchive);
   const timestampFormat = useClientSettings((s) => s.timestampFormat);
@@ -141,6 +143,7 @@ export function useThreadActionMenu(input: {
         isRunning: !threadRuntimeCanArchive(thread.runtime),
         supports,
         snoozePresets,
+        cloud: roer.configured ? { location: roer.location, moving: roer.moving } : null,
       });
       const clicked = await settlePromise(() => api.contextMenu.show(items, position));
       if (clicked._tag === "Failure" || clicked.value === null) return;
@@ -228,6 +231,12 @@ export function useThreadActionMenu(input: {
             setThreadAutoSettle(threadRef, action === "auto-settle:enabled"),
           );
           return;
+        case "move-to-cloud":
+        case "move-to-local": {
+          const to = action === "move-to-cloud" ? "cloud" : "local";
+          if (await roer.move(to)) toastManager.add({ type: "success", title: moveToastTitle(to) });
+          return;
+        }
         case "rename":
           onStartRename();
           return;

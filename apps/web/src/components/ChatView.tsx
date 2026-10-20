@@ -171,7 +171,7 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 import { AsyncResult } from "effect/reactivity";
 import { isElectron } from "../env";
-import { readLocalApi } from "../localApi";
+import { ensureLocalApi, readLocalApi } from "../localApi";
 import { useDiffPanelStore } from "../diffPanelStore";
 import { useActiveThreadRef } from "../hooks/useActiveThreadRef";
 import {
@@ -270,6 +270,7 @@ import {
   AlarmClockIcon,
   CheckCircle2Icon,
   ChevronDownIcon,
+  CloudIcon,
   DownloadIcon,
   GitBranchIcon,
   MessageCircleIcon,
@@ -278,6 +279,7 @@ import {
   TargetIcon,
   WifiOffIcon,
 } from "~/components/appIcons";
+import { moveToastTitle, useRoerPlacementPolling, useRoerThread } from "../state/roer";
 import { cn, randomUUID } from "~/lib/utils";
 import { COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS } from "~/workspaceTitlebar";
 import { stackedThreadToast, toastManager } from "./ui/toast";
@@ -1462,6 +1464,11 @@ export default function ChatView(props: ChatViewProps) {
     : undefined;
   const isServerThread = serverThread !== null;
   const activeThread = isServerThread ? serverThread : localDraftThread;
+  const roer = useRoerThread(serverThread?.environmentId ?? null, serverThread?.id ?? null);
+  useRoerPlacementPolling(
+    roer,
+    serverThread === null ? null : `${serverThread.environmentId}:${serverThread.id}`,
+  );
   const serverLatestRun =
     serverProjection === null ? null : deriveLatestThreadRun(serverProjection);
   const serverActivityRun =
@@ -5424,12 +5431,53 @@ export default function ChatView(props: ChatViewProps) {
     ].filter((item) => item !== null);
     const usageLimitsItems = usageLimitsBanner === null ? [] : [usageLimitsBanner];
     const projectCloneItems = projectCloneBannerItem === null ? [] : [projectCloneBannerItem];
+    // In the cloud the thread here stands still; sending from here would split the work in two.
+    const cloudItems: ComposerBannerStackItem[] =
+      roer.location === "cloud"
+        ? [
+            {
+              id: "roer-cloud",
+              variant: "info",
+              icon: <CloudIcon />,
+              title: "Running in the cloud",
+              description:
+                "This thread continues on Roer's cloud worker. Bring it back before you send from here, so its work lands in this checkout.",
+              actions: (
+                <>
+                  {roer.jobUrl !== null && (
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      onClick={() => void ensureLocalApi().shell.openExternal(roer.jobUrl ?? "")}
+                    >
+                      Follow in Roer
+                    </Button>
+                  )}
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    disabled={roer.moving}
+                    onClick={() =>
+                      void roer.move("local").then((moved) => {
+                        if (moved)
+                          toastManager.add({ type: "success", title: moveToastTitle("local") });
+                      })
+                    }
+                  >
+                    {roer.moving ? "Bringing back…" : "Bring back"}
+                  </Button>
+                </>
+              ),
+            },
+          ]
+        : [];
     if (!localCheckoutBranchMismatch || !showBranchMismatchBanner || !activeBranchMismatchKey) {
       return [
         ...feedbackBannerItems,
         ...limitRecoveryItems,
         ...usageLimitsItems,
         ...projectCloneItems,
+        ...cloudItems,
         ...systemComposerBannerItems,
         ...backgroundWorkItems,
       ];
@@ -5439,6 +5487,7 @@ export default function ChatView(props: ChatViewProps) {
       ...limitRecoveryItems,
       ...usageLimitsItems,
       ...projectCloneItems,
+      ...cloudItems,
       ...systemComposerBannerItems,
       ...backgroundWorkItems,
       {

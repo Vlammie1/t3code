@@ -116,6 +116,7 @@ import {
   WorktreeSetupStreamEvent,
   WorktreeSetupSubscribeInput,
 } from "./worktreeSetup.ts";
+import { RoerError, RoerMoveThreadInput, RoerThreadInput, RoerThreadPlacement } from "./roer.ts";
 import {
   GitActionProgressEvent,
   VcsSwitchRefInput,
@@ -568,6 +569,8 @@ export const WS_METHODS = {
   subscribeVcsStatus: "subscribeVcsStatus",
   subscribeWorktreeSetup: "subscribeWorktreeSetup",
   worktreeSetupCancel: "worktreeSetup.cancel",
+  roerThreadPlacement: "roer.threadPlacement",
+  roerMoveThread: "roer.moveThread",
   subscribeTerminalEvents: "subscribeTerminalEvents",
   subscribeTerminalMetadata: "subscribeTerminalMetadata",
   subscribePreviewEvents: "subscribePreviewEvents",
@@ -1369,6 +1372,18 @@ const WsSubscribeWorktreeSetupRpc = Rpc.make(WS_METHODS.subscribeWorktreeSetup, 
   stream: true,
 });
 
+const WsRoerThreadPlacementRpc = Rpc.make(WS_METHODS.roerThreadPlacement, {
+  payload: RoerThreadInput,
+  success: RoerThreadPlacement,
+  error: Schema.Union([RoerError, EnvironmentAuthorizationError]),
+});
+
+const WsRoerMoveThreadRpc = Rpc.make(WS_METHODS.roerMoveThread, {
+  payload: RoerMoveThreadInput,
+  success: RoerThreadPlacement,
+  error: Schema.Union([RoerError, EnvironmentAuthorizationError]),
+});
+
 const WsWorktreeSetupCancelRpc = Rpc.make(WS_METHODS.worktreeSetupCancel, {
   payload: WorktreeSetupCancelInput,
   success: WorktreeSetupCancelResult,
@@ -2010,6 +2025,8 @@ export const WsRpcGroup = RpcGroup.make(
   WsSubscribeVcsStatusRpc,
   WsSubscribeWorktreeSetupRpc,
   WsWorktreeSetupCancelRpc,
+  WsRoerThreadPlacementRpc,
+  WsRoerMoveThreadRpc,
   WsVcsPullRpc,
   WsVcsRefreshStatusRpc,
   WsGitRunStackedActionRpc,

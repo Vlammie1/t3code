@@ -27,6 +27,7 @@ const baseState: ThreadActionMenuState = {
   snoozePresets: [
     { id: "hour", label: "In 1 hour", whenLabel: "3:00 PM", snoozedUntil: "2026-08-07T15:00:00Z" },
   ],
+  cloud: null,
 };
 
 function ids(state: ThreadActionMenuState): string[] {
@@ -40,6 +41,36 @@ function allIds(state: ThreadActionMenuState): string[] {
 }
 
 describe("buildThreadActionMenuItems", () => {
+  it("offers the way out to the cloud and the way back, only with a Roer link", () => {
+    expect(ids(baseState)).not.toContain("move-to-cloud");
+    expect(ids({ ...baseState, cloud: { location: null, moving: false } })).toContain(
+      "move-to-cloud",
+    );
+    expect(ids({ ...baseState, cloud: { location: "local", moving: false } })).toContain(
+      "move-to-cloud",
+    );
+    const back = buildThreadActionMenuItems({
+      ...baseState,
+      cloud: { location: "cloud", moving: false },
+    });
+    expect(back.map((item) => item.id)).toContain("move-to-local");
+    expect(back.map((item) => item.id)).not.toContain("move-to-cloud");
+    const moving = buildThreadActionMenuItems({
+      ...baseState,
+      cloud: { location: "local", moving: true },
+    });
+    expect(moving.find((item) => item.id === "move-to-cloud")).toMatchObject({
+      label: "Moving…",
+      disabled: true,
+    });
+    const readOnly = buildThreadActionMenuItems({
+      ...baseState,
+      canOperate: false,
+      cloud: { location: "local", moving: false },
+    });
+    expect(readOnly.find((item) => item.id === "move-to-cloud")?.disabled).toBe(true);
+  });
+
   it.each([false, true])(
     "disables both lifecycle directions without permission (reversed: %s)",
     (reversed) => {

@@ -32,6 +32,8 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
   [WS_METHODS.projectCloneCancel]: AuthSourceControlWriteScope,
   [WS_METHODS.projectCloneRetry]: AuthSourceControlWriteScope,
   [WS_METHODS.vcsPull]: AuthSourceControlWriteScope,
+  // Moving a thread interrupts its turn here and pushes its working tree to the cloud worker.
+  [WS_METHODS.roerMoveThread]: AuthOrchestrationOperateScope,
   [WS_METHODS.gitRunStackedAction]: AuthSourceControlWriteScope,
   [WS_METHODS.gitPreparePullRequestThread]: AuthSourceControlWriteScope,
   [WS_METHODS.vcsCreateWorktree]: AuthSourceControlWriteScope,
