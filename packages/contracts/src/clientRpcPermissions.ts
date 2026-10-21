@@ -34,6 +34,8 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
   [WS_METHODS.vcsPull]: AuthSourceControlWriteScope,
   // Moving a thread interrupts its turn here and pushes its working tree to the cloud worker.
   [WS_METHODS.roerMoveThread]: AuthOrchestrationOperateScope,
+  // Sending and stopping from here steer the cloud worker, like a turn here would.
+  [WS_METHODS.roerSteerThread]: AuthOrchestrationOperateScope,
   [WS_METHODS.gitRunStackedAction]: AuthSourceControlWriteScope,
   [WS_METHODS.gitPreparePullRequestThread]: AuthSourceControlWriteScope,
   [WS_METHODS.vcsCreateWorktree]: AuthSourceControlWriteScope,

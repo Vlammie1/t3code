@@ -171,7 +171,7 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 import { AsyncResult } from "effect/reactivity";
 import { isElectron } from "../env";
-import { ensureLocalApi, readLocalApi } from "../localApi";
+import { readLocalApi } from "../localApi";
 import { useDiffPanelStore } from "../diffPanelStore";
 import { useActiveThreadRef } from "../hooks/useActiveThreadRef";
 import {
@@ -279,7 +279,8 @@ import {
   TargetIcon,
   WifiOffIcon,
 } from "~/components/appIcons";
-import { moveToastTitle, useRoerPlacementPolling, useRoerThread } from "../state/roer";
+import { moveToastTitle, useRoerThread, useRoerThreadActivity } from "../state/roer";
+import { mergeRoerTurnItems, roerTurnItems } from "../state/roerTimeline";
 import { cn, randomUUID } from "~/lib/utils";
 import { COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS } from "~/workspaceTitlebar";
 import { stackedThreadToast, toastManager } from "./ui/toast";
@@ -1465,9 +1466,10 @@ export default function ChatView(props: ChatViewProps) {
   const isServerThread = serverThread !== null;
   const activeThread = isServerThread ? serverThread : localDraftThread;
   const roer = useRoerThread(serverThread?.environmentId ?? null, serverThread?.id ?? null);
-  useRoerPlacementPolling(
+  const roerActivity = useRoerThreadActivity(
     roer,
-    serverThread === null ? null : `${serverThread.environmentId}:${serverThread.id}`,
+    serverThread?.environmentId ?? null,
+    serverThread?.id ?? null,
   );
   const serverLatestRun =
     serverProjection === null ? null : deriveLatestThreadRun(serverProjection);
@@ -2842,8 +2844,13 @@ export default function ChatView(props: ChatViewProps) {
           { ...codexFeedbackMessage(submission, "assistant"), runId: null },
         ],
   );
+  // What the thread did in Roer's cloud sits between the turns from here, so its history reads as one thread.
+  const roerCloudTurnItems =
+    serverThread === null || roerActivity == null
+      ? []
+      : roerTurnItems(serverThread.id, roerActivity.entries);
   const serverTimelineEntries = useIncrementalTimelineEntries(activeThreadKey, {
-    visibleTurnItems: serverVisibleTurnItems,
+    visibleTurnItems: mergeRoerTurnItems(serverVisibleTurnItems, roerCloudTurnItems),
     optimisticMessages: optimisticUserMessages,
     anchoredMessages: anchoredTimelineMessages,
     attachmentUrlById: timelineAttachmentUrlById,
@@ -5431,7 +5438,7 @@ export default function ChatView(props: ChatViewProps) {
     ].filter((item) => item !== null);
     const usageLimitsItems = usageLimitsBanner === null ? [] : [usageLimitsBanner];
     const projectCloneItems = projectCloneBannerItem === null ? [] : [projectCloneBannerItem];
-    // In the cloud the thread here stands still; sending from here would split the work in two.
+    // The cloud's work shows in the timeline above, and what is sent from here goes there.
     const cloudItems: ComposerBannerStackItem[] =
       roer.location === "cloud"
         ? [
@@ -5439,18 +5446,18 @@ export default function ChatView(props: ChatViewProps) {
               id: "roer-cloud",
               variant: "info",
               icon: <CloudIcon />,
-              title: "Running in the cloud",
-              description:
-                "This thread continues on Roer's cloud worker. Bring it back before you send from here, so its work lands in this checkout.",
+              title: roer.running ? "Working in the cloud" : "In the cloud",
+              description: "Messages you send go to Roer's cloud worker.",
               actions: (
                 <>
-                  {roer.jobUrl !== null && (
+                  {roer.running && (
                     <Button
                       size="xs"
                       variant="ghost"
-                      onClick={() => void ensureLocalApi().shell.openExternal(roer.jobUrl ?? "")}
+                      disabled={roer.moving}
+                      onClick={() => void roer.steer({ type: "interrupt" })}
                     >
-                      Follow in Roer
+                      Stop
                     </Button>
                   )}
                   <Button
@@ -6072,6 +6079,26 @@ export default function ChatView(props: ChatViewProps) {
         setComposerDraftPrompt(composerDraftTarget, "");
         composerRef.current?.resetCursorState();
       }
+      return;
+    }
+
+    // In the cloud the thread here stands still, so a message goes to the cloud worker instead of starting a turn.
+    if (roer.location === "cloud" && serverThread !== null && !directAnnotation) {
+      if (composerHasNonPromptContent) {
+        toastManager.add(
+          stackedThreadToast({
+            type: "warning",
+            title: "Only text goes to the cloud",
+            description: "Remove the attachments, or bring the thread back to send them.",
+          }),
+        );
+        return;
+      }
+      const text = promptRef.current.trim();
+      if (text === "" || !(await roer.steer({ type: "send", text }))) return;
+      promptRef.current = "";
+      setComposerDraftPrompt(composerDraftTarget, "");
+      composerRef.current?.resetCursorState();
       return;
     }
 

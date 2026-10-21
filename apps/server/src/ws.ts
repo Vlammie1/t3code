@@ -2388,6 +2388,7 @@ const layerWsRpc = (
         [WS_METHODS.serverCheckOtlpEndpoint]: (input) => otlpEndpointCheck.check(input),
         [WS_METHODS.roerThreadPlacement]: (input) => roer.placement(input),
         [WS_METHODS.roerMoveThread]: (input) => roer.moveThread(input),
+        [WS_METHODS.roerSteerThread]: (input) => roer.steerThread(input),
         [WS_METHODS.serverSignalProcess]: (input) => processDiagnostics.signal(input),
         [WS_METHODS.serverReportClientActivity]: (input, metadata) =>
           Ref.update(rpcClientIds, (clientIds) => {
@@ -2773,6 +2774,7 @@ const layerWsRpc = (
             automaticRemoteRefreshInterval: automaticGitFetchInterval,
           }),
         [WS_METHODS.subscribeWorktreeSetup]: (input) => worktreeSetupTracker.stream(input.threadId),
+        [WS_METHODS.subscribeRoerThreadActivity]: (input) => roer.activity(input),
         [WS_METHODS.worktreeSetupCancel]: (input) =>
           worktreeSetupTracker
             .cancel(input.threadId)

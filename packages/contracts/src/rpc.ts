@@ -116,7 +116,14 @@ import {
   WorktreeSetupStreamEvent,
   WorktreeSetupSubscribeInput,
 } from "./worktreeSetup.ts";
-import { RoerError, RoerMoveThreadInput, RoerThreadInput, RoerThreadPlacement } from "./roer.ts";
+import {
+  RoerError,
+  RoerMoveThreadInput,
+  RoerSteerThreadInput,
+  RoerThreadActivity,
+  RoerThreadInput,
+  RoerThreadPlacement,
+} from "./roer.ts";
 import {
   GitActionProgressEvent,
   VcsSwitchRefInput,
@@ -571,6 +578,8 @@ export const WS_METHODS = {
   worktreeSetupCancel: "worktreeSetup.cancel",
   roerThreadPlacement: "roer.threadPlacement",
   roerMoveThread: "roer.moveThread",
+  roerSteerThread: "roer.steerThread",
+  subscribeRoerThreadActivity: "subscribeRoerThreadActivity",
   subscribeTerminalEvents: "subscribeTerminalEvents",
   subscribeTerminalMetadata: "subscribeTerminalMetadata",
   subscribePreviewEvents: "subscribePreviewEvents",
@@ -1384,6 +1393,20 @@ const WsRoerMoveThreadRpc = Rpc.make(WS_METHODS.roerMoveThread, {
   error: Schema.Union([RoerError, EnvironmentAuthorizationError]),
 });
 
+// One RPC for both actions: the group is at the size where TypeScript still infers it.
+const WsRoerSteerThreadRpc = Rpc.make(WS_METHODS.roerSteerThread, {
+  payload: RoerSteerThreadInput,
+  success: RoerThreadPlacement,
+  error: Schema.Union([RoerError, EnvironmentAuthorizationError]),
+});
+
+const WsSubscribeRoerThreadActivityRpc = Rpc.make(WS_METHODS.subscribeRoerThreadActivity, {
+  payload: RoerThreadInput,
+  success: RoerThreadActivity,
+  error: EnvironmentAuthorizationError,
+  stream: true,
+});
+
 const WsWorktreeSetupCancelRpc = Rpc.make(WS_METHODS.worktreeSetupCancel, {
   payload: WorktreeSetupCancelInput,
   success: WorktreeSetupCancelResult,
@@ -2027,6 +2050,8 @@ export const WsRpcGroup = RpcGroup.make(
   WsWorktreeSetupCancelRpc,
   WsRoerThreadPlacementRpc,
   WsRoerMoveThreadRpc,
+  WsRoerSteerThreadRpc,
+  WsSubscribeRoerThreadActivityRpc,
   WsVcsPullRpc,
   WsVcsRefreshStatusRpc,
   WsGitRunStackedActionRpc,

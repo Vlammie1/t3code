@@ -50,6 +50,7 @@ import {
 } from "../rpc/client.ts";
 import type { RpcSession } from "../rpc/session.ts";
 import { followStreamInEnvironment } from "./runtime.ts";
+import { EMPTY_ROER_ACTIVITY, foldRoerActivity } from "./roerActivity.ts";
 import {
   applyServerConfigProjection,
   type ServerConfigProjection,
@@ -1347,6 +1348,17 @@ export function createServerEnvironmentAtoms<R, E>(
         mode: "singleFlight",
         key: ({ environmentId, input }) => `${environmentId}:${input.threadId}`,
       },
+    }),
+    roerSteerThread: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:roer-steer-thread",
+      tag: WS_METHODS.roerSteerThread,
+    }),
+    roerThreadActivity: createEnvironmentRpcSubscriptionAtomFamily(runtime, {
+      label: "environment-data:server:roer-thread-activity",
+      tag: WS_METHODS.subscribeRoerThreadActivity,
+      // Switching back and forth between threads keeps the cloud part instead of fetching it again.
+      idleTtlMs: 60_000,
+      transform: (stream) => stream.pipe(Stream.scan(() => EMPTY_ROER_ACTIVITY, foldRoerActivity)),
     }),
     retryResourceTelemetry: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:server:retry-resource-telemetry",

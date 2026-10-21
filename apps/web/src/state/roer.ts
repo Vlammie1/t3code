@@ -2,14 +2,16 @@ import { RegistryContext, useAtomValue } from "@effect/atom-react";
 import { runAtomCommand } from "@t3tools/client-runtime/state/runtime";
 import type {
   EnvironmentId,
+  RoerSteerThreadInput,
   RoerThreadLocation,
   RoerThreadPlacement,
   ServerSettings,
   ThreadId,
 } from "@t3tools/contracts";
 import { Atom, type AtomRegistry } from "effect/reactivity";
-import { useContext, useEffect, useEffectEvent } from "react";
+import { useContext, useEffect } from "react";
 
+import { useEnvironmentQuery } from "./query";
 import { serverEnvironment } from "./server";
 
 /**
@@ -35,14 +37,13 @@ const NO_SETTINGS_ATOM = Atom.make<ServerSettings | null>(null).pipe(
 const settingsAtomFor = (environmentId: EnvironmentId | null) =>
   environmentId === null ? NO_SETTINGS_ATOM : serverEnvironment.settingsValueAtom(environmentId);
 
-// A move can also start from the phone, so the chat checks back now and then while it is open and visible.
-const POLL_MS = 60_000;
-
 export interface RoerThreadView {
   /** False when this environment has no Roer link; then there is nothing to offer. */
   readonly configured: boolean;
   /** Null until Roer has answered. */
   readonly location: RoerThreadLocation | null;
+  /** Whether the cloud works on it right now; only meaningful while it runs there. */
+  readonly running: boolean;
   readonly moving: boolean;
   readonly jobUrl: string | null;
 }
@@ -52,6 +53,7 @@ const view = (settings: ServerSettings | null, state: RoerThreadState): RoerThre
   return {
     configured,
     location: configured ? (state.placement?.location ?? null) : null,
+    running: state.placement?.running ?? false,
     moving: state.moving,
     jobUrl: state.placement?.jobUrl ?? null,
   };
@@ -100,12 +102,31 @@ export async function moveRoerThread(
   return result._tag === "Success";
 }
 
+/** A message for the thread in the cloud, or stopping its turn there. Roer's reason for refusing surfaces as a failure. */
+export async function steerRoerThread(
+  registry: Registry,
+  ref: ThreadRef,
+  action: RoerSteerThreadInput["action"],
+): Promise<boolean> {
+  const result = await runAtomCommand(
+    registry,
+    serverEnvironment.roerSteerThread,
+    { environmentId: ref.environmentId, input: { threadId: ref.threadId, action } },
+    { label: serverEnvironment.roerSteerThread.label, reportFailure: true, reportDefect: true },
+  );
+  if (result._tag !== "Success") return false;
+  const atom = atomFor(ref);
+  registry.set(atom, { ...registry.get(atom), placement: result.value });
+  return true;
+}
+
 export const moveToastTitle = (to: RoerThreadLocation) =>
   to === "cloud" ? "Thread moved to the cloud" : "Thread is back on this machine";
 
 export interface RoerThread extends RoerThreadView {
   readonly refresh: () => Promise<void>;
   readonly move: (to: RoerThreadLocation) => Promise<boolean>;
+  readonly steer: (action: RoerSteerThreadInput["action"]) => Promise<boolean>;
 }
 
 export function useRoerThread(
@@ -121,19 +142,40 @@ export function useRoerThread(
     ...current,
     refresh: () => (ref === null ? Promise.resolve() : refreshRoerThread(registry, ref)),
     move: (to) => (ref === null ? Promise.resolve(false) : moveRoerThread(registry, ref, to)),
+    steer: (action) =>
+      ref === null ? Promise.resolve(false) : steerRoerThread(registry, ref, action),
   };
 }
 
-/** Keeps the placement of the open thread current; mount it once, where the thread is shown. */
-export function useRoerPlacementPolling(roer: RoerThread, threadKey: string | null): void {
-  const poll = useEffectEvent(() => void roer.refresh());
-  const { configured } = roer;
+/**
+ * What the open thread did and does in the cloud, live. Mount it once, where the thread is shown. Its placement also
+ * keeps the menus current, because a move can start from the phone.
+ */
+export function useRoerThreadActivity(
+  roer: RoerThread,
+  environmentId: EnvironmentId | null,
+  threadId: ThreadId | null,
+) {
+  const registry = useContext(RegistryContext);
+  const query = useEnvironmentQuery(
+    roer.configured && environmentId !== null && threadId !== null
+      ? serverEnvironment.roerThreadActivity({ environmentId, input: { threadId } })
+      : null,
+  );
+  const activity = query.data;
+  const placement = activity?.placement ?? null;
   useEffect(() => {
-    if (!configured || threadKey === null) return;
-    poll();
-    const timer = window.setInterval(() => {
-      if (document.visibilityState === "visible") poll();
-    }, POLL_MS);
-    return () => window.clearInterval(timer);
-  }, [configured, threadKey]);
+    if (environmentId === null || threadId === null || placement === null) return;
+    const atom = atomFor({ environmentId, threadId });
+    const current = registry.get(atom);
+    if (!current.moving) registry.set(atom, { ...current, placement });
+  }, [registry, environmentId, threadId, placement]);
+  // A move from here knows the new place before the stream, which asks slowly while the thread is here: start over.
+  const { refresh } = query;
+  const streamLocation = placement?.location ?? null;
+  const stale = !roer.moving && streamLocation !== null && roer.location !== streamLocation;
+  useEffect(() => {
+    if (stale) refresh();
+  }, [stale, refresh]);
+  return activity;
 }

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "@effect/vitest";
 import { ThreadId } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
+import * as Stream from "effect/Stream";
+import * as TestClock from "effect/testing/TestClock";
 import { HttpClient, HttpClientResponse } from "effect/http";
 
 import * as ThreadManagementService from "../orchestration-v2/ThreadManagementService.ts";
@@ -71,6 +74,7 @@ describe("RoerService", () => {
       expect(placement).toEqual({
         configured: true,
         location: "cloud",
+        running: true,
         jobId: "klus_1",
         jobUrl: "https://roer.test/#/klus/klus_1",
         branch: "mate/fix-login-abc123",
@@ -94,6 +98,72 @@ describe("RoerService", () => {
       const failed = yield* roer.placement({ threadId }).pipe(Effect.flip);
       expect(failed.detail).toBe("Roer answered with HTTP 500.");
       expect(failed.detail).not.toContain("roer-secret");
+    }).pipe(Effect.provide(layer));
+  });
+
+  it.effect("shows the cloud work, then only what changed, quickly while the cloud works", () => {
+    let text = "Ik kijk";
+    // Roer sends a growing text again with its new content; an unchanged row is not news.
+    const { requests, layer } = fixture(() =>
+      Response.json({
+        klusId: "klus_1",
+        waar: "server",
+        status: "bezig",
+        branch: null,
+        regels: [
+          {
+            volgnr: 4,
+            tijd: "2026-10-21T10:00:00.000Z",
+            gebeurtenis: { soort: "melding", tekst: "Verplaatst naar de server.", naar: "server" },
+          },
+          {
+            volgnr: 5,
+            tijd: "2026-10-21T10:00:01.000Z",
+            gebeurtenis: { soort: "tekst", tekst: text, klaar: false },
+          },
+        ],
+      }),
+    );
+    return Effect.gen(function* () {
+      const roer = yield* RoerService.RoerService;
+      const frames = yield* roer
+        .activity({ threadId })
+        .pipe(Stream.take(2), Stream.runCollect, Effect.forkChild);
+      yield* TestClock.adjust("1 second");
+      text = "Ik kijk naar de login";
+      yield* TestClock.adjust("1 second");
+      const [first, second] = yield* Fiber.join(frames);
+      expect(first!.replace).toBe(true);
+      expect(first!.entries.map((entry) => [entry.kind, entry.text])).toEqual([
+        ["notice", "Moved to the cloud"],
+        ["assistant", "Ik kijk"],
+      ]);
+      expect(second!.replace).toBe(false);
+      expect(second!.entries.map((entry) => entry.text)).toEqual(["Ik kijk naar de login"]);
+      expect(requests[1]!.path).toBe("/api/t3/thread/thread-1/wolk");
+    }).pipe(Effect.provide(layer));
+  });
+
+  it.effect("sends to the cloud and stops its turn, but not once the thread is back", () => {
+    let where = "server";
+    const { requests, layer } = fixture((path) =>
+      path.startsWith("/api/klus/")
+        ? Response.json({ klus: {} })
+        : Response.json({ klusId: "klus_1", waar: where, status: "bezig", branch: null }),
+    );
+    return Effect.gen(function* () {
+      const roer = yield* RoerService.RoerService;
+      yield* roer.steerThread({ threadId, action: { type: "send", text: "Test ook de uitlog" } });
+      yield* roer.steerThread({ threadId, action: { type: "interrupt" } });
+      expect(requests.filter((request) => request.path.startsWith("/api/klus/"))).toEqual([
+        { path: "/api/klus/klus_1/bericht", body: { tekst: "Test ook de uitlog" } },
+        { path: "/api/klus/klus_1/onderbreek", body: {} },
+      ]);
+      where = "laptop";
+      const refused = yield* roer
+        .steerThread({ threadId, action: { type: "interrupt" } })
+        .pipe(Effect.flip);
+      expect(refused.detail).toMatch(/runs on this machine/);
     }).pipe(Effect.provide(layer));
   });
 });

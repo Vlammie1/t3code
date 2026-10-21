@@ -164,6 +164,8 @@ const RPC_AGGREGATES = {
   [WS_METHODS.worktreeSetupCancel]: "vcs",
   [WS_METHODS.roerThreadPlacement]: "roer",
   [WS_METHODS.roerMoveThread]: "roer",
+  [WS_METHODS.roerSteerThread]: "roer",
+  [WS_METHODS.subscribeRoerThreadActivity]: "roer",
   [WS_METHODS.subscribeResourceTelemetry]: "server",
   [WS_METHODS.vcsRefreshStatus]: "vcs",
   [WS_METHODS.vcsPull]: "git",
