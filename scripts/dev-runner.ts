@@ -92,8 +92,17 @@ type PortAvailabilityCheck<R = never> = (
 
 const DEV_RUNNER_MODES = Object.keys(MODE_ARGS) as Array<DevMode>;
 
-export function getDevRunnerModeArgs(mode: DevMode): ReadonlyArray<string> {
-  return MODE_ARGS[mode];
+/**
+ * `reuseBuild` skips the `dependsOn` builds (dev:desktop rebuilds web and
+ * server first, which takes minutes) and starts on the existing
+ * `apps/server/dist`. Vite+ only reads the flag before the task name.
+ */
+export function getDevRunnerModeArgs(
+  mode: DevMode,
+  options: { readonly reuseBuild?: boolean | undefined } = {},
+): ReadonlyArray<string> {
+  const [run, ...rest] = MODE_ARGS[mode];
+  return options.reuseBuild ? [run, "--ignore-depends-on", ...rest] : MODE_ARGS[mode];
 }
 
 export function isBrowserAllowedPort(port: number): boolean {
@@ -583,6 +592,7 @@ interface DevRunnerCliInput {
   readonly devUrl: URL | undefined;
   readonly dryRun: boolean;
   readonly share: boolean;
+  readonly reuseBuild?: boolean;
   readonly runArgs: ReadonlyArray<string>;
 }
 
@@ -729,7 +739,10 @@ export function runDevRunnerWithInput(input: DevRunnerCliInput) {
       }
     }
 
-    const args = [...MODE_ARGS[input.mode], ...input.runArgs];
+    const args = [
+      ...getDevRunnerModeArgs(input.mode, { reuseBuild: input.reuseBuild }),
+      ...input.runArgs,
+    ];
     const spawnCommand = yield* resolveSpawnCommand("vp", args, { env });
     const processContext = {
       mode: input.mode,
@@ -829,6 +842,12 @@ const devRunnerCli = Command.make("dev-runner", {
   share: Flag.Boolean("share").pipe(
     Flag.withDescription(
       "Publish the web dev server on this machine's tailnet over HTTPS (via `tailscale serve`) and print the pairing URL for it. Removed again on exit.",
+    ),
+    Flag.withDefault(false),
+  ),
+  reuseBuild: Flag.Boolean("reuse-build").pipe(
+    Flag.withDescription(
+      "Start on the existing web and server builds instead of rebuilding them first. Only safe when apps/server/dist matches the source.",
     ),
     Flag.withDefault(false),
   ),

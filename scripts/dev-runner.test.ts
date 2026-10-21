@@ -96,6 +96,18 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
       }),
     );
 
+    it.effect("skips the dependsOn builds before the task name when reusing builds", () =>
+      Effect.sync(() => {
+        assert.deepStrictEqual(getDevRunnerModeArgs("dev:desktop", { reuseBuild: true }), [
+          "run",
+          "--ignore-depends-on",
+          "--filter=@t3tools/desktop",
+          "--filter=@t3tools/web",
+          "dev",
+        ]);
+      }),
+    );
+
     it.effect("places Vite+ run flags before the task name", () =>
       Effect.sync(() => {
         assert.deepStrictEqual(getDevRunnerModeArgs("dev"), [

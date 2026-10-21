@@ -23,6 +23,8 @@ See the [mobile README](../../apps/mobile/README.md) for native builds and Metro
 
 Flags go directly after the task name, for example `vp run dev --home-dir /tmp/t3code-dev`.
 Add `--browser` to open a browser automatically.
+`dev:desktop` rebuilds web and server before it starts, which takes minutes. When `apps/server/dist`
+already matches the source, `--reuse-build` skips that step.
 
 ### State and ports
 
