@@ -322,7 +322,9 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
       yield* Effect.gen(function* () {
         const current = yield* snapshot.getSnapshot;
         if (!current.enabled || !current.version || !current.usageLimits) return;
-        if (current.usageLimits.unavailable) return;
+        // A failed probe is exactly when this read matters; only an account
+        // without windows has nothing to read.
+        if (current.usageLimits.unavailable?.reason === "unsupported") return;
         // Clients lease only the provider-wide scope: one keyed by instance would never match.
         if (!(yield* host.shouldRunBackgroundWork({ type: "provider-status" }))) return;
         const update = yield* ClaudeResetCredits.readClaudeUsageWindows(configDir, current.version);

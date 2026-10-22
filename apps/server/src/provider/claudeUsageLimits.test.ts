@@ -99,6 +99,16 @@ describe("claudeUsageResponseToLimits", () => {
     ).toEqual({ checkedAt, windows: [], unavailable: { reason: "unsupported" } });
   });
 
+  it("treats a subscription without windows as a failed read, not an unsupported account", () => {
+    expect(
+      claudeUsageResponseToLimits({
+        checkedAt,
+        subscribed: true,
+        response: { rate_limits_available: false, rate_limits: null },
+      }).limits,
+    ).toEqual({ checkedAt, windows: [], unavailable: { reason: "probeFailed" } });
+  });
+
   it("skips a window the endpoint reports without a utilization", () => {
     expect(
       claudeUsageResponseToLimits({

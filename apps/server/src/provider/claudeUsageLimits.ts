@@ -168,11 +168,20 @@ export function claudeRateLimitEventToUpdate(
 export function claudeUsageResponseToLimits(input: {
   readonly response: Pick<SDKControlGetUsageResponse, "rate_limits_available" | "rate_limits">;
   readonly checkedAt: string;
+  /**
+   * A subscription always has windows. The CLI also answers "not available"
+   * when its own usage read failed (Anthropic rate-limits that endpoint), and
+   * calling that unsupported would hide the bars and stop every later update.
+   */
+  readonly subscribed?: boolean;
 }): { readonly limits: ServerProviderUsageLimits; readonly names: ClaudeScopedLimitNames } {
   const { response, checkedAt } = input;
   if (!response.rate_limits_available || !response.rate_limits) {
     return {
-      limits: makeUnavailableUsageLimits({ checkedAt, reason: "unsupported" }),
+      limits: makeUnavailableUsageLimits({
+        checkedAt,
+        reason: input.subscribed === true ? "probeFailed" : "unsupported",
+      }),
       names: { overageIncluded: undefined },
     };
   }

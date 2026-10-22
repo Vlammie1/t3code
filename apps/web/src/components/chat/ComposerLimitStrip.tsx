@@ -175,7 +175,9 @@ export function ComposerLimitStrip(props: {
         window,
       })),
   );
-  const cacheDriver = accounts[0]?.driver;
+  // The cache belongs to the thread's session, so it shows even while the
+  // account's windows cannot be read.
+  const cacheDriver = props.report.accounts[0]?.driver;
   const cache =
     props.promptCache === null || cacheDriver === undefined
       ? null
