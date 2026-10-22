@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { applyUsageLimitsUpdate, resolveUsageLimitsAfterProbe } from "./usageLimits.ts";
+import {
+  applyUsageLimitsUpdate,
+  mergeUsageWindow,
+  resolveUsageLimitsAfterProbe,
+} from "./usageLimits.ts";
 
 const checkedAt = "2026-09-03T12:00:00.000Z";
 const session = {
@@ -78,7 +82,73 @@ describe("applyUsageLimitsUpdate", () => {
   });
 });
 
+describe("mergeUsageWindow", () => {
+  const now = Date.parse(checkedAt);
+
+  it("keeps the highest reading inside one window, whatever source lands last", () => {
+    // The stream said 55%, then a lagging endpoint poll says 52% for the same reset.
+    expect(
+      mergeUsageWindow({ ...session, usedPercent: 55 }, { ...session, usedPercent: 52 }, now),
+    ).toEqual({ ...session, usedPercent: 55 });
+    expect(
+      mergeUsageWindow(
+        { ...session, usedPercent: 55 },
+        // Epoch seconds against an ISO string with milliseconds: still the same window.
+        { ...session, usedPercent: 57, resetsAt: "2026-09-03T14:00:01.000Z" },
+        now,
+      ),
+    ).toEqual({ ...session, usedPercent: 57, resetsAt: "2026-09-03T14:00:01.000Z" });
+  });
+
+  it("starts over at a new window and drops a reading from an earlier one", () => {
+    const next = { ...session, usedPercent: 3, resetsAt: "2026-09-03T19:00:00.000Z" };
+    expect(mergeUsageWindow({ ...session, usedPercent: 90 }, next, now)).toBe(next);
+    const stale = { ...session, usedPercent: 10, resetsAt: "2026-09-03T09:00:00.000Z" };
+    const current = { ...session, usedPercent: 40 };
+    expect(mergeUsageWindow(current, stale, now)).toBe(current);
+  });
+
+  it("accepts any reading once the known window has passed", () => {
+    const fresh = { ...session, usedPercent: 2 };
+    expect(
+      mergeUsageWindow({ ...session, usedPercent: 90 }, fresh, Date.parse(session.resetsAt)),
+    ).toBe(fresh);
+  });
+
+  it("cannot tell windows apart without a reset time", () => {
+    const lower = { ...weekly, usedPercent: 5 };
+    expect(mergeUsageWindow(weekly, lower, now)).toBe(lower);
+  });
+});
+
 describe("resolveUsageLimitsAfterProbe", () => {
+  it("does not let a probe pull a window back inside the same window", () => {
+    const probed = {
+      checkedAt: "2026-09-03T12:03:00.000Z",
+      windows: [{ ...session, usedPercent: 38 }, weekly],
+    };
+    expect(
+      resolveUsageLimitsAfterProbe({
+        published: { checkedAt, windows: [{ ...session, usedPercent: 41 }, weekly] },
+        probed,
+      }),
+    ).toEqual({ ...probed, windows: [{ ...session, usedPercent: 41 }, weekly] });
+  });
+
+  it("takes the probe as is after a reset credit was spent", () => {
+    const probed = {
+      checkedAt: "2026-09-03T12:03:00.000Z",
+      windows: [{ ...session, usedPercent: 0 }, weekly],
+      resetCredits: { availableCount: 1 },
+    };
+    expect(
+      resolveUsageLimitsAfterProbe({
+        published: { ...published, resetCredits: { availableCount: 2 } },
+        probed,
+      }),
+    ).toBe(probed);
+  });
+
   it("keeps the last good windows through a failed probe but not an unsupported one", () => {
     const failed = { checkedAt, windows: [], unavailable: { reason: "probeFailed" as const } };
     const unsupported = { checkedAt, windows: [], unavailable: { reason: "unsupported" as const } };

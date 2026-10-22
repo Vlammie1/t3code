@@ -1,5 +1,14 @@
+import { formatDuration } from "@t3tools/shared/usageLimits";
+
 import { Button } from "../ui/button";
-import { type ContextWindowSnapshot, formatContextWindowTokens } from "~/lib/contextWindow";
+import {
+  type ContextWindowSnapshot,
+  formatContextWindowTokens,
+  formatPromptCacheSize,
+  type PromptCacheSize,
+  type PromptCacheWindow,
+} from "~/lib/contextWindow";
+import { useNowMinute } from "../../hooks/useNowMinute";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import {
   formatContextWindowCompactionMessage,
@@ -18,14 +27,35 @@ function formatPercentage(value: number | null): string | null {
   return `${Math.round(value)}%`;
 }
 
+function promptCacheLabel(
+  size: PromptCacheSize,
+  window: PromptCacheWindow | null,
+  now: number,
+): string {
+  if (window === null) return formatPromptCacheSize(size);
+  const left = Date.parse(window.refreshedAt) + window.ttlMs - now;
+  if (left <= 0) return "Expired";
+  return `${formatPromptCacheSize(size)} · ${formatDuration(left)} left`;
+}
+
 export function ContextWindowMeter(props: {
   usage: ContextWindowSnapshot;
+  /** Null before the provider's first token report. */
+  promptCacheSize?: PromptCacheSize | null;
+  /** Known only where the provider reports its cache lifetime. */
+  promptCache?: PromptCacheWindow | null;
   modelDisplayName?: string | null;
   onCompact?: (() => void) | undefined;
   compactDisabled?: boolean | undefined;
   compactDisabledReason?: string | null | undefined;
 }) {
   const { usage, modelDisplayName, onCompact, compactDisabled, compactDisabledReason } = props;
+  const nowMinute = useNowMinute();
+  const promptCacheSize = props.promptCacheSize ?? null;
+  const promptCacheText =
+    promptCacheSize === null
+      ? null
+      : promptCacheLabel(promptCacheSize, props.promptCache ?? null, Date.parse(`${nowMinute}Z`));
   const usedPercentage = formatPercentage(usage.usedPercentage);
   const normalizedPercentage = Math.max(0, Math.min(100, usage.usedPercentage ?? 0));
   const radius = 9.75;
@@ -133,6 +163,14 @@ export function ContextWindowMeter(props: {
               <span className="text-secondary-label">Total processed</span>
               <span className="font-medium tabular-nums text-secondary-label">
                 {formatContextWindowTokens(totalProcessedTokens)}
+              </span>
+            </div>
+          ) : null}
+          {promptCacheText !== null ? (
+            <div className="flex items-center justify-between gap-3 text-2xs leading-4">
+              <span className="text-secondary-label">Prompt cache</span>
+              <span className="font-medium tabular-nums text-secondary-label">
+                {promptCacheText}
               </span>
             </div>
           ) : null}

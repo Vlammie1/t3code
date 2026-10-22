@@ -672,12 +672,14 @@ export const makePiAdapterV2 = Effect.fn("makePiAdapterV2")(function* (
         const totals = recordField(stats, "tokens");
         const inputTokens = nonNegativeInteger(totals, "input");
         const cachedInputTokens = nonNegativeInteger(totals, "cacheRead");
+        const cacheCreationTokens = nonNegativeInteger(totals, "cacheWrite");
         const outputTokens = nonNegativeInteger(totals, "output");
         return {
           usedTokens,
           maxTokens,
           ...(inputTokens === undefined ? {} : { inputTokens }),
           ...(cachedInputTokens === undefined ? {} : { cachedInputTokens }),
+          ...(cacheCreationTokens === undefined ? {} : { cacheCreationTokens }),
           ...(outputTokens === undefined ? {} : { outputTokens }),
           updatedAt: DateTime.formatIso(updatedAt),
         };
@@ -707,6 +709,7 @@ export const makePiAdapterV2 = Effect.fn("makePiAdapterV2")(function* (
           turn.lastLiveUsedTokens = usedTokens;
           const inputTokens = nonNegativeInteger(usage, "input");
           const cachedInputTokens = nonNegativeInteger(usage, "cacheRead");
+          const cacheCreationTokens = nonNegativeInteger(usage, "cacheWrite");
           const outputTokens = nonNegativeInteger(usage, "output");
           const updatedAt = yield* DateTime.now;
           yield* emit({
@@ -720,6 +723,7 @@ export const makePiAdapterV2 = Effect.fn("makePiAdapterV2")(function* (
                 maxTokens: contextWindow,
                 ...(inputTokens === undefined ? {} : { inputTokens }),
                 ...(cachedInputTokens === undefined ? {} : { cachedInputTokens }),
+                ...(cacheCreationTokens === undefined ? {} : { cacheCreationTokens }),
                 ...(outputTokens === undefined ? {} : { outputTokens }),
                 updatedAt: DateTime.formatIso(updatedAt),
               },

@@ -528,6 +528,13 @@ export const ProjectContextEntry = Schema.Struct({
 });
 export type ProjectContextEntry = typeof ProjectContextEntry.Type;
 
+/** Coordinator threads carry this id prefix, so the server recognises them without a lookup. */
+export const PROJECT_COORDINATOR_THREAD_ID_PREFIX = "project-coordinator:";
+
+export function isProjectCoordinatorThreadId(threadId: string): boolean {
+  return threadId.startsWith(PROJECT_COORDINATOR_THREAD_ID_PREFIX);
+}
+
 /**
  * A project with a goal, context and a coordinator thread that starts and
  * follows the project's other threads. Projects without a brief stay plain
@@ -539,6 +546,8 @@ export const ProjectBrief = Schema.Struct({
     Schema.isMaxLength(PROJECT_BRIEF_CONTEXT_MAX_ENTRIES),
   ),
   coordinatorThreadId: Schema.NullOr(ThreadId),
+  /** Set once the server pinned the coordinator, so an unpin by the user sticks. */
+  coordinatorPinned: Schema.optional(Schema.Boolean),
 });
 export type ProjectBrief = typeof ProjectBrief.Type;
 

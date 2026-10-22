@@ -1473,6 +1473,9 @@ export const makeMuseAdapterV2 = Effect.fn("makeMuseAdapterV2")(function* (
                       inputTokens: usage.usage.inputTokens,
                       outputTokens: usage.usage.outputTokens,
                       cachedInputTokens: usage.usage.cacheReadTokens ?? usage.usage.cachedTokens,
+                      ...(usage.usage.cacheWriteTokens === undefined
+                        ? {}
+                        : { cacheCreationTokens: usage.usage.cacheWriteTokens }),
                       reasoningOutputTokens: usage.usage.reasoningTokens,
                       updatedAt: DateTime.formatIso(yield* DateTime.now),
                     },

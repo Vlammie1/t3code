@@ -7,6 +7,7 @@ import {
   type ProjectCreateWithBriefResult,
   ProjectId,
   type ProjectUpdateBriefInput,
+  PROJECT_COORDINATOR_THREAD_ID_PREFIX,
   ThreadId,
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
@@ -239,7 +240,7 @@ const make = Effect.gen(function* () {
       const current = yield* settings.getSettings.pipe(
         Effect.mapError(fail("launch-coordinator", "Settings could not be read.")),
       );
-      const coordinatorThreadId = ThreadId.make(`project-coordinator:${id}`);
+      const coordinatorThreadId = ThreadId.make(`${PROJECT_COORDINATOR_THREAD_ID_PREFIX}${id}`);
       // Saved before the launch so the thread is recognised as the coordinator
       // from its first event on.
       yield* saveBrief(projectId, { ...draft, coordinatorThreadId });

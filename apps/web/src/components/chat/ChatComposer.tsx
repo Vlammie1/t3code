@@ -1091,7 +1091,11 @@ import {
   resolveComposerDispatchMode,
   type ComposerDispatchMode,
 } from "@t3tools/client-runtime/state/composer-dispatch";
-import type { ContextWindowSnapshot } from "../../lib/contextWindow";
+import type {
+  ContextWindowSnapshot,
+  PromptCacheSize,
+  PromptCacheWindow,
+} from "../../lib/contextWindow";
 import {
   getProviderSlashCommandsForSlashMenu,
   getProviderSkillsForSlashMenu,
@@ -1343,6 +1347,8 @@ const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryActions(
   compact: boolean;
   canOperateThread: boolean;
   activeContextWindow: ContextWindowSnapshot | null;
+  activePromptCache: PromptCacheWindow | null;
+  activePromptCacheSize: PromptCacheSize | null;
   reserveContextWindowMeter: boolean;
   activeThreadModelDisplayName: string | null;
   isPreparingWorktree: boolean;
@@ -1385,6 +1391,8 @@ const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryActions(
       {props.activeContextWindow ? (
         <ContextWindowMeter
           usage={props.activeContextWindow}
+          promptCache={props.activePromptCache}
+          promptCacheSize={props.activePromptCacheSize}
           modelDisplayName={props.activeThreadModelDisplayName}
           onCompact={props.onCompactContext}
           compactDisabled={props.compactDisabled}
@@ -1571,6 +1579,8 @@ export interface ChatComposerProps {
   activeProjectId: ProjectId | null;
 
   activeContextWindow: ContextWindowSnapshot | null;
+  activePromptCache: PromptCacheWindow | null;
+  activePromptCacheSize: PromptCacheSize | null;
   compactThreadUnavailable: boolean;
   compactDisabled: boolean;
   compactDisabledReason: string | null;
@@ -1941,6 +1951,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     reportedModelSelection,
     activeProjectId,
     activeContextWindow,
+    activePromptCache,
+    activePromptCacheSize,
     compactThreadUnavailable,
     compactDisabled,
     compactDisabledReason,
@@ -7254,6 +7266,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     activeContextWindow={
                       settings.contextWindowMeterEnabled ? activeContextWindow : null
                     }
+                    activePromptCache={activePromptCache}
+                    activePromptCacheSize={activePromptCacheSize}
                     reserveContextWindowMeter={reserveContextWindowMeter}
                     activeThreadModelDisplayName={activeThreadModelDisplayName}
                     pendingAction={pendingPrimaryAction}

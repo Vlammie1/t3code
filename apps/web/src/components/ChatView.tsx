@@ -471,6 +471,7 @@ import {
 import {
   deriveLatestContextWindowSnapshot,
   latestProviderTurnTokenUsage,
+  promptCacheSize,
   promptCacheWindow,
 } from "../lib/contextWindow";
 import {
@@ -2581,6 +2582,7 @@ export default function ChatView(props: ChatViewProps) {
     selectedProvider === "claudeAgent"
       ? promptCacheWindow(serverProjection?.providerTurns ?? [])
       : null;
+  const composerPromptCacheSize = promptCacheSize(serverProjection?.providerTurns ?? []);
   const pendingBackgroundTasks = (() => {
     if (serverProjection === null || serverProjection === undefined) {
       return [];
@@ -8368,6 +8370,7 @@ export default function ChatView(props: ChatViewProps) {
                                     report={usageLimitsLiveReport}
                                     onOpen={() => void openUsageLimits()}
                                     promptCache={composerPromptCache}
+                                    promptCacheSize={composerPromptCacheSize}
                                   />
                                 ) : null
                               }
@@ -8408,6 +8411,8 @@ export default function ChatView(props: ChatViewProps) {
                               activeThreadModelSelection={activeThread?.modelSelection}
                               activeProjectId={activeProject?.id ?? null}
                               activeContextWindow={activeContextWindow}
+                              activePromptCache={composerPromptCache}
+                              activePromptCacheSize={composerPromptCacheSize}
                               activeTasksProgress={activeComposerTasksProgress}
                               activeTaskSteps={activeComposerTaskSteps}
                               compactThreadUnavailable={compactThreadUnavailable}

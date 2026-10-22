@@ -231,6 +231,7 @@ export function claudeProviderTurnTokenUsage(
     maxTokens: claudeContextWindow(modelSelection),
     inputTokens,
     cachedInputTokens: usage.cache_read_input_tokens ?? 0,
+    cacheCreationTokens: usage.cache_creation_input_tokens ?? 0,
     outputTokens,
     reasoningOutputTokens: 0,
     ...(promptCacheTtlMs === undefined ? {} : { promptCacheTtlMs }),

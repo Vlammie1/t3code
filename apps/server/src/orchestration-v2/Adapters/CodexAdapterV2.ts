@@ -195,6 +195,9 @@ export function codexProviderTurnTokenUsage(
     maxTokens: tokenUsage.modelContextWindow ?? null,
     inputTokens: Math.max(0, tokenUsage.last.inputTokens),
     cachedInputTokens: Math.max(0, tokenUsage.last.cachedInputTokens),
+    ...(tokenUsage.last.cacheWriteInputTokens === undefined
+      ? {}
+      : { cacheCreationTokens: Math.max(0, tokenUsage.last.cacheWriteInputTokens) }),
     outputTokens: Math.max(0, tokenUsage.last.outputTokens),
     reasoningOutputTokens: Math.max(0, tokenUsage.last.reasoningOutputTokens),
     updatedAt,

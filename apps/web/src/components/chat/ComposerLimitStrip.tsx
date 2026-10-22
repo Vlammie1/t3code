@@ -11,7 +11,11 @@ import {
 } from "@t3tools/shared/usageLimits";
 
 import { useNowMinute } from "../../hooks/useNowMinute";
-import type { PromptCacheWindow } from "../../lib/contextWindow";
+import {
+  formatPromptCacheSize,
+  type PromptCacheSize,
+  type PromptCacheWindow,
+} from "../../lib/contextWindow";
 import { cn } from "~/lib/utils";
 import { barColor } from "../usage/UsageLimits";
 import { ComposerBanner } from "./ComposerBanner";
@@ -99,16 +103,19 @@ const CACHE_LOW_SHARE = 0.1;
 function CacheSegment(props: {
   readonly driver: ServerProvider["driver"];
   readonly cache: PromptCacheWindow;
+  readonly size: PromptCacheSize | null;
   readonly now: number;
 }) {
   const left = Math.max(0, Date.parse(props.cache.refreshedAt) + props.cache.ttlMs - props.now);
   const share = Math.min(1, left / props.cache.ttlMs);
   const color = share < CACHE_LOW_SHARE ? "var(--warning)" : barColor(props.driver);
   const leftLabel = left === 0 ? "Expired" : formatDuration(left);
+  // An expired cache holds nothing; the next request writes it again.
+  const sizeLabel = props.size === null || left === 0 ? null : formatPromptCacheSize(props.size);
   return (
     <div
       role="meter"
-      aria-label={`Prompt cache: ${left === 0 ? "expired" : `${leftLabel} left`}`}
+      aria-label={`Prompt cache${sizeLabel === null ? "" : ` of ${sizeLabel} tokens`}: ${left === 0 ? "expired" : `${leftLabel} left`}`}
       aria-valuenow={Math.round(share * 100)}
       aria-valuemin={0}
       aria-valuemax={100}
@@ -116,7 +123,19 @@ function CacheSegment(props: {
     >
       <span className="flex min-w-0 items-baseline gap-1.5 text-xs">
         <span className="truncate text-muted-foreground">Cache</span>
-        <span className="ms-auto shrink-0 text-muted-foreground/70 tabular-nums">{leftLabel}</span>
+        {sizeLabel === null ? null : (
+          <span className="ms-auto shrink-0 font-medium text-foreground tabular-nums">
+            {sizeLabel}
+          </span>
+        )}
+        <span
+          className={cn(
+            "shrink-0 text-muted-foreground/70 tabular-nums",
+            sizeLabel === null && "ms-auto",
+          )}
+        >
+          {leftLabel}
+        </span>
       </span>
       <span className="relative block h-1 w-full rounded-full bg-foreground/8">
         <span
@@ -136,6 +155,7 @@ export function ComposerLimitStrip(props: {
   readonly report: UsageLimitsReport;
   readonly onOpen: () => void;
   readonly promptCache: PromptCacheWindow | null;
+  readonly promptCacheSize: PromptCacheSize | null;
 }) {
   const nowMinute = useNowMinute();
   // The minute tick is a UTC ISO prefix without its zone; parse it as UTC.
@@ -183,7 +203,12 @@ export function ComposerLimitStrip(props: {
             />
           ))}
           {cache === null ? null : (
-            <CacheSegment driver={cache.driver} cache={cache.window} now={now} />
+            <CacheSegment
+              driver={cache.driver}
+              cache={cache.window}
+              size={props.promptCacheSize}
+              now={now}
+            />
           )}
         </div>
       </ComposerBanner.Root>

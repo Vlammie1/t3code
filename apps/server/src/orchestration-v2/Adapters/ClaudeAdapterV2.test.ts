@@ -905,6 +905,7 @@ describe("ClaudeAdapterV2 context usage", () => {
       maxTokens: 200_000,
       inputTokens: 49_000,
       cachedInputTokens: 5_000,
+      cacheCreationTokens: 2_000,
       outputTokens: 1_000,
       reasoningOutputTokens: 0,
       updatedAt: "2026-08-29T00:00:00.000Z",

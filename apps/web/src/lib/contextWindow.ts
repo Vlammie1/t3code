@@ -65,6 +65,34 @@ export function promptCacheWindow(
     : { refreshedAt: latest.updatedAt, ttlMs: ttl.ttlMs };
 }
 
+export interface PromptCacheSize {
+  /**
+   * Cache read plus cache write tokens of the newest request: the prompt prefix the provider
+   * holds after it. Null when the provider does not report cache tokens at all.
+   */
+  readonly tokens: number | null;
+  /** False when only cache reads are reported, so `tokens` is a lower bound. */
+  readonly includesWrites: boolean;
+}
+
+/** Measured from the provider's own token report, never estimated. Null before any report. */
+export function promptCacheSize(
+  turns: ReadonlyArray<Pick<OrchestrationV2ProviderTurn, "tokenUsage">>,
+): PromptCacheSize | null {
+  const latest = latestProviderTurnTokenUsage(turns);
+  if (latest === null) return null;
+  if (latest.cachedInputTokens === undefined) return { tokens: null, includesWrites: false };
+  return {
+    tokens: latest.cachedInputTokens + (latest.cacheCreationTokens ?? 0),
+    includesWrites: latest.cacheCreationTokens !== undefined,
+  };
+}
+
+export function formatPromptCacheSize(size: PromptCacheSize): string {
+  if (size.tokens === null) return "Not reported";
+  return `${size.includesWrites ? "" : "≥ "}${formatContextWindowTokens(size.tokens)}`;
+}
+
 export function deriveLatestContextWindowSnapshot(
   entries: ReadonlyArray<{
     readonly item: OrchestrationV2TurnItem;

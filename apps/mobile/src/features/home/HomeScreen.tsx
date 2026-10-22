@@ -697,6 +697,7 @@ export function HomeScreen(props: HomeScreenProps) {
             pendingTask={item.pendingTask}
             project={projectByKey.get(pendingScopeKey) ?? null}
             projectTitle={v2ProjectTitleByProjectKey.get(pendingScopeKey)}
+            projectShownAbove={v2ProjectScopeKey !== null}
             environmentLabel={
               Object.keys(props.savedConnectionsById).length > 1
                 ? (props.savedConnectionsById[item.pendingTask.environmentId]?.environmentLabel ??
@@ -763,6 +764,7 @@ export function HomeScreen(props: HomeScreenProps) {
           projectTitle={v2ProjectTitleByProjectKey.get(
             scopedProjectKey(thread.environmentId, thread.projectId),
           )}
+          projectShownAbove={v2ProjectScopeKey !== null}
           providerInstance={resolveProviderInstance(thread)}
           providers={providersByEnvironmentId.get(thread.environmentId)}
           environmentLabel={
@@ -852,6 +854,7 @@ export function HomeScreen(props: HomeScreenProps) {
       toggleSettledShelf,
       toggleSnoozedShelf,
       toggleWorkingShelf,
+      v2ProjectScopeKey,
       v2ProjectTitleByProjectKey,
       props.searchQuery,
       workingShelfEnabled,

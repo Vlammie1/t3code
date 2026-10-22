@@ -2,6 +2,7 @@ import { modelSelectionsEqual } from "@t3tools/shared/model";
 import { projectComposerContextForProvider } from "@t3tools/shared/composerContextReferences";
 import {
   CommandId,
+  isProjectCoordinatorThreadId,
   latestProviderTurnForAttempt,
   type OrchestrationV2DomainEvent,
   type OrchestrationV2ExecutionNode,
@@ -44,6 +45,7 @@ import {
   latestNativeContextUsage,
 } from "@t3tools/provider-core/server/handoffBudget";
 import { deliverContextHandoffs } from "./ContextHandoffDelivery.ts";
+import { coordinatorCacheExpired, coordinatorRecapItems } from "./coordinatorFreshSession.ts";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import * as ProjectionStore from "./ProjectionStore.ts";
@@ -658,35 +660,61 @@ export const layer: Layer.Layer<
             handoff.delivery?.nativeThreadId === providerThread.nativeThreadRef?.nativeId &&
             handoff.delivery?.status === "pending",
         );
+        const startsFresh =
+          !uncertainDelivery &&
+          isProjectCoordinatorThreadId(projection.thread.id) &&
+          coordinatorCacheExpired({
+            providerTurns: projection.providerTurns,
+            providerThreadId: providerThread.id,
+            now: DateTime.toEpochMillis(yield* DateTime.now),
+          });
         const resumed = yield* Effect.result(
-          uncertainDelivery
+          startsFresh
             ? Effect.fail(
                 new ProviderAdapter.ProviderAdapterTurnStartError({
                   driver: session.driver,
                   threadId: projection.thread.id,
                   providerThreadId: providerThread.id,
                   runId,
-                  cause: "Uncertain native history injection",
+                  cause: "Coordinator prompt cache expired",
                 }),
               )
-            : session.resumeThread({
-                providerThread,
-                threadId: projection.thread.id,
-                modelSelection: run.modelSelection,
-                runtimePolicy: resolvedRuntimePolicy,
-              }),
+            : uncertainDelivery
+              ? Effect.fail(
+                  new ProviderAdapter.ProviderAdapterTurnStartError({
+                    driver: session.driver,
+                    threadId: projection.thread.id,
+                    providerThreadId: providerThread.id,
+                    runId,
+                    cause: "Uncertain native history injection",
+                  }),
+                )
+              : session.resumeThread({
+                  providerThread,
+                  threadId: projection.thread.id,
+                  modelSelection: run.modelSelection,
+                  runtimePolicy: resolvedRuntimePolicy,
+                }),
         );
         if (resumed._tag === "Success") {
           return resumed.success;
         }
 
-        yield* Effect.logWarning("Provider resume failed; attempting a fresh native session", {
-          driver: session.driver,
-          providerThreadId: providerThread.id,
-          runId,
-          reason: uncertainDelivery ? "uncertain_history_delivery" : "resume_failed",
-          errorTag: resumed.failure._tag,
-        });
+        if (startsFresh) {
+          yield* Effect.logInfo("Coordinator cache expired; starting a fresh native session", {
+            driver: session.driver,
+            providerThreadId: providerThread.id,
+            runId,
+          });
+        } else {
+          yield* Effect.logWarning("Provider resume failed; attempting a fresh native session", {
+            driver: session.driver,
+            providerThreadId: providerThread.id,
+            runId,
+            reason: uncertainDelivery ? "uncertain_history_delivery" : "resume_failed",
+            errorTag: resumed.failure._tag,
+          });
+        }
         const replacement = yield* loadFromProvider(
           session.ensureThread({
             threadId: projection.thread.id,
@@ -718,12 +746,22 @@ export const layer: Layer.Layer<
           coveredRunOrdinals: { from: 1, to: Math.max(1, run.ordinal - 1) },
           strategy: "full_thread_summary",
           runs: projection.runs,
-          items: (yield* projectionStore.getTurnStartHistory(input.threadId)).filter(
-            (item) =>
-              item.runId === null ||
-              projection.runs.some(
-                (source) => source.id === item.runId && source.ordinal < run.ordinal,
-              ),
+          items: yield* Effect.map(
+            projectionStore.getTurnStartHistory(input.threadId),
+            (history) =>
+              startsFresh
+                ? coordinatorRecapItems({
+                    items: history,
+                    runs: projection.runs,
+                    targetOrdinal: run.ordinal,
+                  })
+                : history.filter(
+                    (item) =>
+                      item.runId === null ||
+                      projection.runs.some(
+                        (source) => source.id === item.runId && source.ordinal < run.ordinal,
+                      ),
+                  ),
           ),
           createdAt,
         });

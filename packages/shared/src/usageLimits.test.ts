@@ -25,6 +25,7 @@ import {
   providersWithLimits,
   remainingPercent,
   usesChatGptSharing,
+  windowAt,
 } from "./usageLimits.ts";
 
 const now = Date.parse("2026-09-03T12:00:00.000Z");
@@ -91,6 +92,14 @@ describe("pace", () => {
     expect(formatResetsIn({ ...window, resetsAt: "2026-09-03T11:00:00.000Z" }, now)).toBe(
       "resets now",
     );
+  });
+});
+
+describe("windowAt", () => {
+  it("shows a window whose reset has passed as spent from zero", () => {
+    expect(windowAt(window, now)).toBe(window);
+    const { resetsAt: _passed, ...rest } = window;
+    expect(windowAt(window, Date.parse(window.resetsAt))).toEqual({ ...rest, usedPercent: 0 });
   });
 });
 

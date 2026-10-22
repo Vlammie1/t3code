@@ -4,6 +4,7 @@ import {
   deriveLatestContextWindowSnapshot,
   formatContextWindowTokens,
   latestProviderTurnTokenUsage,
+  promptCacheSize,
   promptCacheWindow,
 } from "./contextWindow";
 
@@ -133,5 +134,48 @@ describe("promptCacheWindow", () => {
         { tokenUsage: { usedTokens: 10, updatedAt: "2026-06-20T09:00:00.000Z" } },
       ]),
     ).toBeNull();
+  });
+});
+
+describe("promptCacheSize", () => {
+  it("measures the newest request's cache reads plus writes", () => {
+    expect(
+      promptCacheSize([
+        {
+          tokenUsage: {
+            usedTokens: 10,
+            cachedInputTokens: 40_000,
+            cacheCreationTokens: 9_000,
+            updatedAt: "2026-06-20T09:00:00.000Z",
+          },
+        },
+        {
+          tokenUsage: {
+            usedTokens: 20,
+            cachedInputTokens: 49_000,
+            cacheCreationTokens: 1_200,
+            updatedAt: "2026-06-20T09:01:00.000Z",
+          },
+        },
+      ]),
+    ).toEqual({ tokens: 50_200, includesWrites: true });
+  });
+
+  it("says so when writes or the cache itself go unreported", () => {
+    expect(
+      promptCacheSize([
+        {
+          tokenUsage: {
+            usedTokens: 10,
+            cachedInputTokens: 3_000,
+            updatedAt: "2026-06-20T09:00:00.000Z",
+          },
+        },
+      ]),
+    ).toEqual({ tokens: 3_000, includesWrites: false });
+    expect(
+      promptCacheSize([{ tokenUsage: { usedTokens: 10, updatedAt: "2026-06-20T09:00:00.000Z" } }]),
+    ).toEqual({ tokens: null, includesWrites: false });
+    expect(promptCacheSize([])).toBeNull();
   });
 });

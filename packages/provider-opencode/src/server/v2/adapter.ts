@@ -1536,6 +1536,7 @@ export const make = Effect.fn("OpenCode2Adapter.make")(function* (instanceId: Pr
                 maxTokens: window ?? null,
                 inputTokens: lastStep.input + lastStep.cache.read + lastStep.cache.write,
                 cachedInputTokens: lastStep.cache.read,
+                cacheCreationTokens: lastStep.cache.write,
                 outputTokens: lastStep.output,
                 reasoningOutputTokens: lastStep.reasoning,
                 updatedAt: DateTime.formatIso(completedAt),

@@ -493,6 +493,21 @@ function resetMillis(window: ServerProviderUsageWindow): number | null {
   return Number.isFinite(at) ? at : null;
 }
 
+/**
+ * A window whose reset has passed is spent from zero again, even before a
+ * provider reports the next one: the next window only starts with the next
+ * request, so its reset time is not known yet either.
+ */
+export function windowAt(
+  window: ServerProviderUsageWindow,
+  now: number,
+): ServerProviderUsageWindow {
+  const resetsAt = resetMillis(window);
+  if (resetsAt === null || resetsAt > now) return window;
+  const { resetsAt: _passed, ...rest } = window;
+  return { ...rest, usedPercent: 0 };
+}
+
 export function elapsedShare(window: ServerProviderUsageWindow, now: number): number | null {
   const resetsAt = resetMillis(window);
   if (resetsAt === null || window.windowDurationMins === undefined) return null;
@@ -697,5 +712,14 @@ export function collectProviderUsageLimits(
       notices.push(`${source.label}: ${source.error}`);
     }
   }
-  return { createdAt: DateTime.formatIso(DateTime.makeUnsafe(now)), accounts, notices };
+  return {
+    createdAt: DateTime.formatIso(DateTime.makeUnsafe(now)),
+    accounts: accounts.map((account) => {
+      const windows = account.limits.windows.map((window) => windowAt(window, now));
+      return windows.some((window, index) => window !== account.limits.windows[index])
+        ? { ...account, limits: { ...account.limits, windows } }
+        : account;
+    }),
+    notices,
+  };
 }

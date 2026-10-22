@@ -19,6 +19,14 @@ The coordinator runs on Claude Sonnet 5.5 with low effort, so following the work
 cheap. The chats it starts use the environment's default model unless it picks another one for the
 task. Change the coordinator's model in its composer like any other thread.
 
+Once a project has five chats, T3 Code pins the coordinator to the top of the sidebar. Unpin it
+like any other thread and it stays unpinned.
+
+When you come back to the coordinator after its provider's prompt cache has expired (an hour on a
+Claude subscription), it continues in a fresh session that carries only its briefing and your last
+exchange. That keeps a long coordinator conversation from being sent again in full. It reads
+earlier messages and other chats again when it needs them.
+
 ## Change the goal or context
 
 Open the project and select the goal to edit it, or use **+** in **Context**. T3 Code keeps the

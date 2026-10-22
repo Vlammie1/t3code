@@ -304,6 +304,8 @@ export const ThreadListV2PendingRow = memo(function ThreadListV2PendingRow(props
   readonly pendingTask: PendingNewTask;
   readonly project: EnvironmentProject | null;
   readonly projectTitle?: string;
+  /** The list is scoped to this project, so the row does not repeat it. */
+  readonly projectShownAbove?: boolean;
   readonly environmentLabel: string | null;
   readonly environmentMachine?: EnvironmentMachineKind;
   readonly pane?: "screen" | "sidebar";
@@ -315,7 +317,9 @@ export const ThreadListV2PendingRow = memo(function ThreadListV2PendingRow(props
   const { pendingTask, onSelectPendingTask, onDeletePendingTask } = props;
   const sidebarPane = props.pane === "sidebar";
   const isDraft = pendingTask.kind === "draft";
-  const projectTitle = props.projectTitle ?? props.project?.title ?? pendingTask.projectTitle ?? "";
+  const projectTitle = props.projectShownAbove
+    ? ""
+    : (props.projectTitle ?? props.project?.title ?? pendingTask.projectTitle ?? "");
   const branch = pendingTask.branch;
 
   const handleMenuAction = useCallback(
@@ -328,7 +332,7 @@ export const ThreadListV2PendingRow = memo(function ThreadListV2PendingRow(props
   const rowContent = (
     <>
       <View className="flex-row items-center gap-1.5">
-        {props.project ? (
+        {props.project && !props.projectShownAbove ? (
           <ProjectFavicon
             environmentId={pendingTask.environmentId}
             faviconPath={props.project.faviconPath}
@@ -482,6 +486,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
   readonly snoozePresetMinute: string;
   readonly project: EnvironmentProject | null;
   readonly projectTitle?: string;
+  readonly projectShownAbove?: boolean;
   readonly providers: ReadonlyArray<ThreadListProvider> | undefined;
   readonly providerInstance: ThreadRowProviderInstance | null;
   readonly environmentLabel: string | null;
@@ -914,7 +919,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
   const cardContent = (
     <>
       <View className="flex-row items-center gap-1.5">
-        {props.project ? (
+        {props.project && !props.projectShownAbove ? (
           <ProjectFavicon
             environmentId={thread.environmentId}
             faviconPath={props.project.faviconPath}
@@ -933,7 +938,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
           )}
           numberOfLines={1}
         >
-          {props.projectTitle ?? props.project?.title ?? ""}
+          {props.projectShownAbove ? "" : (props.projectTitle ?? props.project?.title ?? "")}
         </Text>
         {props.hasQueuedMessages ? <QueuedMessageIcon selected={selected} /> : null}
         {pinnedRow ? (

@@ -955,6 +955,8 @@ export const OrchestrationV2ProviderTurnTokenUsage = Schema.Struct({
   maxTokens: Schema.optional(Schema.NullOr(NonNegativeInt)),
   inputTokens: Schema.optional(NonNegativeInt),
   cachedInputTokens: Schema.optional(NonNegativeInt),
+  /** Absent when the provider does not report cache writes, so the cache size stays unknown. */
+  cacheCreationTokens: Schema.optional(NonNegativeInt),
   outputTokens: Schema.optional(NonNegativeInt),
   reasoningOutputTokens: Schema.optional(NonNegativeInt),
   promptCacheTtlMs: Schema.optional(PositiveInt),
