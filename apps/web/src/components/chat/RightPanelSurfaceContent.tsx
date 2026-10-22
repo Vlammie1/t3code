@@ -10,6 +10,7 @@ import type {
 } from "@t3tools/contracts";
 import { scopedThreadKey } from "@t3tools/client-runtime/environment";
 import { Activity, lazy, Suspense } from "react";
+import type { FileExplorerRoot } from "../files/FilePreviewPanel";
 import type { ComposerImageAttachment, DraftId } from "../../composerDraftStore";
 import type { ShortcutMatchContext } from "../../keybindings";
 import { type RightPanelSurface, useRightPanelStore } from "../../rightPanelStore";
@@ -53,6 +54,8 @@ export interface RightPanelPullRequestProps {
 export interface RightPanelFileProps {
   readonly projectName: string | null;
   readonly workspaceRoot: string | undefined;
+  /** Folders outside the workspace the thread also reads, such as a project brief's context. */
+  readonly extraRoots: ReadonlyArray<FileExplorerRoot>;
   readonly availableEditors: ReadonlyArray<EditorId>;
   readonly pendingSurfaceIds: ReadonlySet<string>;
   readonly onOpenFile: (relativePath: string) => void;
@@ -216,6 +219,7 @@ function ShownSurfaceContent(props: RightPanelSurfaceContentProps) {
             environmentId={props.environmentId}
             cwd={files.workspaceRoot ?? ""}
             projectName={files.projectName ?? ""}
+            extraRoots={files.extraRoots}
             threadRef={threadRef}
             composerDraftTarget={props.composerDraftTarget}
             keybindings={props.keybindings}

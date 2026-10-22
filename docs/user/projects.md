@@ -34,4 +34,6 @@ goal and context in `AGENTS.md` in the project folder, which every chat in the p
 it starts. Notes you add to that file outside the project brief section stay.
 
 Context paths live on the machine that runs the project. Chats reach them by their full path; they
-do not get a checkout of their own.
+do not get a checkout of their own. In a project chat, pick a context folder from the list at the
+top of **Files** to read it there. The sidebar names the folder a chat works in when its title
+mentions one, such as `Lockspace: paywall`; the coordinator titles its chats that way.

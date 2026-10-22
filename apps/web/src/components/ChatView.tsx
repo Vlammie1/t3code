@@ -468,6 +468,9 @@ import {
   hasDismissedResumeCompaction,
   shouldOfferResumeCompaction,
 } from "./chat/ContextWindowMeter.logic";
+import { projectFocusCandidates } from "@t3tools/client-runtime/state/projectFocus";
+import type { FileExplorerRoot } from "./files/FilePreviewPanel";
+import { useProjectBrief } from "../state/projectBriefs";
 import {
   deriveLatestContextWindowSnapshot,
   latestProviderTurnTokenUsage,
@@ -646,6 +649,7 @@ function useDraftHeroLayoutTransition(
 }
 
 const EMPTY_PENDING_FILE_SURFACE_IDS: ReadonlySet<string> = new Set();
+const EMPTY_FILE_ROOTS: ReadonlyArray<FileExplorerRoot> = [];
 // Wider than any panel may be, so the document fills up to the cap and leaves the chat its minimum.
 const DOCUMENT_PANEL_DEFAULT_WIDTH = 4000;
 type EnvironmentUnavailableState = {
@@ -3044,6 +3048,16 @@ export default function ChatView(props: ChatViewProps) {
   const activeProjectCwd = activeProject?.workspaceRoot ?? null;
   const activeThreadWorktreePath = activeThread?.worktreePath ?? null;
   const activeWorkspaceRoot = activeThreadWorktreePath ?? activeProjectCwd ?? undefined;
+  const activeProjectBrief = useProjectBrief(activeProject ?? null);
+  // A briefed project's chats run in its own folder but work in the context
+  // folders, so the explorer offers those as well.
+  const activeExtraFileRoots =
+    activeProjectBrief === null
+      ? EMPTY_FILE_ROOTS
+      : projectFocusCandidates(
+          activeProjectBrief,
+          allProjects.filter((project) => project.environmentId === activeProject?.environmentId),
+        );
   const sessionImages = activeThreadRef
     ? collectSessionImages(timelineEntries, {
         threadId: activeThreadRef.threadId,
@@ -7877,6 +7891,7 @@ export default function ChatView(props: ChatViewProps) {
       files={{
         projectName: activeProject?.title ?? null,
         workspaceRoot: activeWorkspaceRoot,
+        extraRoots: activeExtraFileRoots,
         availableEditors,
         pendingSurfaceIds: pendingFileSurfaceIds,
         onOpenFile: openFileSurfaceStable,

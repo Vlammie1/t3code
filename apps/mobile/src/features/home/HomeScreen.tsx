@@ -52,6 +52,11 @@ import { useThreadSearch } from "../../state/queries";
 import { useThreadJumpShortcuts } from "../keyboard/threadKeyboardShortcuts";
 import { usePendingThreadOrder } from "../../state/thread-order";
 import { threadListEnvironmentsAtom } from "../../state/server";
+import { useProjectBriefsByEnvironment } from "../../state/projectBriefs";
+import {
+  projectFocusCandidates,
+  resolveThreadFocus,
+} from "@t3tools/client-runtime/state/projectFocus";
 import type { PendingNewTask } from "../../state/use-pending-new-tasks";
 import { useQueuedThreadKeys } from "../../state/use-thread-outbox";
 import {
@@ -435,6 +440,31 @@ export function HomeScreen(props: HomeScreenProps) {
       ),
     [projectScopes],
   );
+  const projectBriefsByEnvironment = useProjectBriefsByEnvironment(
+    props.projects.map((project) => project.environmentId),
+  );
+  const focusCandidatesByProjectKey = useMemo(
+    () =>
+      new Map(
+        props.projects.flatMap((project) => {
+          const brief = projectBriefsByEnvironment.get(project.environmentId)?.[project.id];
+          return brief === undefined
+            ? []
+            : [
+                [
+                  scopedProjectKey(project.environmentId, project.id),
+                  projectFocusCandidates(
+                    brief,
+                    props.projects.filter(
+                      (candidate) => candidate.environmentId === project.environmentId,
+                    ),
+                  ),
+                ] as const,
+              ];
+        }),
+      ),
+    [projectBriefsByEnvironment, props.projects],
+  );
   const v2ScopedProjectKeys = useMemo(
     () =>
       v2ScopedProjectGroup === null
@@ -765,6 +795,12 @@ export function HomeScreen(props: HomeScreenProps) {
             scopedProjectKey(thread.environmentId, thread.projectId),
           )}
           projectShownAbove={v2ProjectScopeKey !== null}
+          focus={resolveThreadFocus(
+            thread.title,
+            focusCandidatesByProjectKey.get(
+              scopedProjectKey(thread.environmentId, thread.projectId),
+            ) ?? [],
+          )}
           providerInstance={resolveProviderInstance(thread)}
           providers={providersByEnvironmentId.get(thread.environmentId)}
           environmentLabel={
@@ -856,6 +892,7 @@ export function HomeScreen(props: HomeScreenProps) {
       toggleWorkingShelf,
       v2ProjectScopeKey,
       v2ProjectTitleByProjectKey,
+      focusCandidatesByProjectKey,
       props.searchQuery,
       workingShelfEnabled,
     ],

@@ -5,6 +5,7 @@ import {
   fileBreadcrumbChildren,
   fileBreadcrumbParent,
   fileBreadcrumbs,
+  hostPathRelativeTo,
   isListableHostFolder,
   joinHostPath,
   retainedBreadcrumbTrail,
@@ -188,5 +189,27 @@ describe("fileBreadcrumbParent", () => {
     ["", null],
   ])("returns the parent of %j", (path, expected) => {
     expect(fileBreadcrumbParent(path)).toBe(expected);
+  });
+});
+
+describe("hostPathRelativeTo", () => {
+  it("names a file inside a host folder the way the folder's listing does", () => {
+    expect(
+      hostPathRelativeTo(
+        String.raw`C:\Users\dev\Lockspace`,
+        String.raw`c:\users\dev\Lockspace\src\App.tsx`,
+      ),
+    ).toBe("src/App.tsx");
+    expect(hostPathRelativeTo("/home/dev/site/", "/home/dev/site/index.html")).toBe("index.html");
+  });
+
+  it("is null outside the folder, including a sibling that only shares its prefix", () => {
+    expect(
+      hostPathRelativeTo(
+        String.raw`C:\Users\dev\Lockspace`,
+        String.raw`C:\Users\dev\LockspaceOld\a.md`,
+      ),
+    ).toBeNull();
+    expect(hostPathRelativeTo("/home/dev/site", "/home/Dev/site/a.md")).toBeNull();
   });
 });

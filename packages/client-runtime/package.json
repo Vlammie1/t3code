@@ -203,6 +203,10 @@
       "types": "./src/state/projects.ts",
       "default": "./src/state/projects.ts"
     },
+    "./state/projectFocus": {
+      "types": "./src/state/projectFocus.ts",
+      "default": "./src/state/projectFocus.ts"
+    },
     "./state/provider-instance-display": {
       "types": "./src/state/providerInstanceDisplay.ts",
       "default": "./src/state/providerInstanceDisplay.ts"

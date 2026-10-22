@@ -17,6 +17,7 @@ import type {
   EnvironmentProject,
   EnvironmentThreadShell,
 } from "@t3tools/client-runtime/state/shell";
+import type { ProjectFocus } from "@t3tools/client-runtime/state/projectFocus";
 import type { EnvironmentThreadSearchMatch } from "@t3tools/client-runtime/state/thread-search";
 import { AuthOrchestrationOperateScope, type EnvironmentMachineKind } from "@t3tools/contracts";
 import { canSnooze, resolveSnoozePresets } from "@t3tools/client-runtime/state/thread-settled";
@@ -487,6 +488,8 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
   readonly project: EnvironmentProject | null;
   readonly projectTitle?: string;
   readonly projectShownAbove?: boolean;
+  /** For a briefed project's chat: the context folder it works on, which says more than the brief's own name. */
+  readonly focus?: ProjectFocus | null;
   readonly providers: ReadonlyArray<ThreadListProvider> | undefined;
   readonly providerInstance: ThreadRowProviderInstance | null;
   readonly environmentLabel: string | null;
@@ -916,17 +919,28 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
       ? `Opens the thread. Swipe left to ${primaryAction.label.toLowerCase()}.`
       : `Opens the thread. Swipe left for ${primaryAction.label.toLowerCase()} and snooze actions.`;
 
+  const briefTitle = props.projectShownAbove
+    ? ""
+    : (props.projectTitle ?? props.project?.title ?? "");
+  const projectLabel = props.focus
+    ? briefTitle === ""
+      ? props.focus.name
+      : `${props.focus.name} · ${briefTitle}`
+    : briefTitle;
+  const faviconProject =
+    props.focus?.project ?? (props.projectShownAbove ? null : (props.project ?? null));
+
   const cardContent = (
     <>
       <View className="flex-row items-center gap-1.5">
-        {props.project && !props.projectShownAbove ? (
+        {faviconProject ? (
           <ProjectFavicon
             environmentId={thread.environmentId}
-            faviconPath={props.project.faviconPath}
-            projectIcon={props.project.projectIcon}
+            faviconPath={faviconProject.faviconPath}
+            projectIcon={faviconProject.projectIcon}
             size={15}
-            projectTitle={props.project.title}
-            workspaceRoot={props.project.workspaceRoot}
+            projectTitle={faviconProject.title}
+            workspaceRoot={faviconProject.workspaceRoot}
           />
         ) : null}
         <Text
@@ -938,7 +952,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
           )}
           numberOfLines={1}
         >
-          {props.projectShownAbove ? "" : (props.projectTitle ?? props.project?.title ?? "")}
+          {projectLabel}
         </Text>
         {props.hasQueuedMessages ? <QueuedMessageIcon selected={selected} /> : null}
         {pinnedRow ? (

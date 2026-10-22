@@ -262,6 +262,12 @@ import {
 } from "./ThreadStatusIndicators";
 import { resolveSnoozePresets, snoozeWakeLabel, type SnoozePreset } from "./Sidebar.snooze";
 import { ProjectFavicon, type ProjectFaviconProject } from "./ProjectFavicon";
+import {
+  type ProjectFocus,
+  projectFocusCandidates,
+  resolveThreadFocus,
+} from "@t3tools/client-runtime/state/projectFocus";
+import { useBriefedProjects } from "../state/projectBriefs";
 import { ThreadSearchMatchExcerpt } from "./ThreadSearchMatch";
 import { makeWorkspaceFileDropHandlers } from "./chat/workspaceFileDrop";
 import { ProviderInstanceIcon } from "./chat/ProviderInstanceIcon";
@@ -854,6 +860,7 @@ function useSidebarLookups() {
   const serverConfigs = useServerConfigs();
   const providerEntriesByEnvironment = useAtomValue(sidebarProviderEntriesAtom);
   const projectGroups = useSidebarProjectGroups();
+  const briefedProjects = useBriefedProjects();
   const environmentLabelById = new Map(
     environments.map((environment) => [environment.environmentId, environment.label] as const),
   );
@@ -884,6 +891,15 @@ function useSidebarLookups() {
     { value: "all", label: "All projects" },
     ...projectGroups.map((project) => ({ value: project.projectKey, label: project.displayName })),
   ];
+  const focusCandidatesByProjectKey = new Map(
+    briefedProjects.map(({ project, brief }) => [
+      `${project.environmentId}:${project.id}`,
+      projectFocusCandidates(
+        brief,
+        projects.filter((candidate) => candidate.environmentId === project.environmentId),
+      ),
+    ]),
+  );
   return {
     projects,
     serverConfigs,
@@ -892,6 +908,7 @@ function useSidebarLookups() {
     providerEntriesByEnvironment,
     projectByKey,
     projectDisplayNameByKey,
+    focusCandidatesByProjectKey,
     projectGroupByScopeKey,
     projectGroupKeyByProjectKey,
     projectRankByGroupKey,
@@ -1713,6 +1730,8 @@ type SidebarThreadRowProps = {
   projectDisplayName: string | null;
   /** A project header or scope already names the project, so the row does not repeat it. */
   projectShownAbove: boolean;
+  /** For a briefed project's chat: the context folder it works on, which says more than the brief's own name. */
+  focus: ProjectFocus | null;
   providerEntryByInstanceId: ReadonlyMap<string, SidebarProviderEntry>;
   timestampFormat: TimestampFormat;
   onThreadClick: (event: ReactMouseEvent, threadRef: ScopedThreadRef) => void;
@@ -2440,10 +2459,27 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
           <div className="relative z-10 h-[4.875rem] px-(--sidebar-row-content-inset) py-(--sidebar-content-inset)">
             <div className="flex h-5 min-w-0 items-center gap-1.5">
               {draftIndicator}
-              {props.project && !props.projectShownAbove ? (
+              {props.focus?.project ? (
+                <ProjectFavicon project={props.focus.project} className="size-4 shrink-0" />
+              ) : props.project && !props.projectShownAbove ? (
                 <ProjectFavicon project={props.project} className="size-4 shrink-0" />
               ) : null}
-              {props.projectDisplayName && !props.projectShownAbove ? (
+              {props.focus ? (
+                <span
+                  className={cn(
+                    "min-w-0 flex-1 truncate text-secondary-label text-xs",
+                    shouldRecede ? "font-normal" : "font-medium",
+                  )}
+                >
+                  {props.focus.name}
+                  {props.projectDisplayName && !props.projectShownAbove ? (
+                    <span className="font-normal text-muted-foreground/70">
+                      {" · "}
+                      {props.projectDisplayName}
+                    </span>
+                  ) : null}
+                </span>
+              ) : props.projectDisplayName && !props.projectShownAbove ? (
                 <span
                   className={cn(
                     "min-w-0 flex-1 truncate text-secondary-label text-xs",
@@ -2858,6 +2894,7 @@ export default function Sidebar() {
     providerEntriesByEnvironment,
     projectByKey,
     projectDisplayNameByKey,
+    focusCandidatesByProjectKey,
     projectGroupByScopeKey,
     projectGroupKeyByProjectKey,
     projectRankByGroupKey,
@@ -5083,6 +5120,12 @@ export default function Sidebar() {
                               projectScopeKey !== null ||
                               (threadView === "project" && section === "active")
                             }
+                            focus={resolveThreadFocus(
+                              thread.title,
+                              focusCandidatesByProjectKey.get(
+                                `${thread.environmentId}:${thread.projectId}`,
+                              ) ?? [],
+                            )}
                             providerEntryByInstanceId={
                               providerEntriesByEnvironment.get(thread.environmentId) ??
                               EMPTY_PROVIDER_ENTRIES

@@ -109,27 +109,57 @@ function makeWindow(
 }
 
 /**
- * Utilization is a 0–1 fraction on the streamed event. An overage-included
- * event before any probe has named the bucket is dropped: guessing a name
- * would draw a row the next probe cannot reconcile.
+ * The CLI reports every window it knows under `unified_windows` since it
+ * stopped putting `utilization` on the event itself. That shipped after the SDK
+ * typings we pin, so it is read structurally until the `.d.ts` catches up.
  */
+interface UnifiedWindow {
+  readonly utilization: number;
+  readonly resetsAt?: number;
+}
+
+function readUnifiedWindows(info: object): ReadonlyArray<readonly [string, UnifiedWindow]> {
+  const raw = (info as { readonly unifiedWindows?: unknown }).unifiedWindows;
+  if (typeof raw !== "object" || raw === null) return [];
+  return Object.entries(raw).filter(
+    (entry): entry is [string, UnifiedWindow] =>
+      typeof entry[1] === "object" &&
+      entry[1] !== null &&
+      typeof (entry[1] as UnifiedWindow).utilization === "number",
+  );
+}
+
+function eventWindow(
+  type: string,
+  utilization: number,
+  resetsAtSeconds: number | undefined,
+  names: ClaudeScopedLimitNames,
+): ServerProviderUsageWindow | undefined {
+  // Utilization is a 0–1 fraction on the streamed event.
+  const usedPercent = utilization * 100;
+  const resetsAt = isoFromEpochSeconds(resetsAtSeconds);
+  if (type in WINDOWS) return makeWindow(type, usedPercent, resetsAt);
+  // An overage-included window before any probe has named the bucket is
+  // dropped: guessing a name would draw a row the next probe cannot reconcile.
+  if (type === OVERAGE_INCLUDED_EVENT_TYPE && names.overageIncluded) {
+    return scopedWindow(names.overageIncluded, usedPercent, resetsAt);
+  }
+  return undefined;
+}
+
 export function claudeRateLimitEventToUpdate(
   info: SDKRateLimitInfo,
   names: ClaudeScopedLimitNames,
 ): ProviderUsageLimitsUpdate | undefined {
+  const windows = readUnifiedWindows(info).flatMap(([type, window]) => {
+    const next = eventWindow(type, window.utilization, window.resetsAt, names);
+    return next === undefined ? [] : [next];
+  });
+  if (windows.length > 0) return { windows };
   const type: string | undefined = info.rateLimitType;
-  if (!type || typeof info.utilization !== "number") {
-    return undefined;
-  }
-  const usedPercent = info.utilization * 100;
-  const resetsAt = isoFromEpochSeconds(info.resetsAt);
-  if (type in WINDOWS) {
-    return { windows: [makeWindow(type, usedPercent, resetsAt)] };
-  }
-  if (type === OVERAGE_INCLUDED_EVENT_TYPE && names.overageIncluded) {
-    return { windows: [scopedWindow(names.overageIncluded, usedPercent, resetsAt)] };
-  }
-  return undefined;
+  if (!type || typeof info.utilization !== "number") return undefined;
+  const legacy = eventWindow(type, info.utilization, info.resetsAt, names);
+  return legacy === undefined ? undefined : { windows: [legacy] };
 }
 
 /**

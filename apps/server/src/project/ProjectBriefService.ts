@@ -123,7 +123,7 @@ export function coordinatorBriefing(input: {
     "",
     "How to work:",
     "- Do small things yourself: answering, reading context, a quick look at a file. Start a separate thread for each independent piece of real work with `t3_thread_launch`, leaving out projectId so it lands in this project.",
-    "- Give every thread a short title and a self-contained `message`: the task, the context paths it needs, what done looks like, and to finish with a summary.",
+    "- Give every thread a short title that starts with the name of the context folder it works in, like `Lockspace: paywall`, so the sidebar can show that folder instead of this project. Give it a self-contained `message`: the task, the context paths it needs, what done looks like, and to finish with a summary.",
     modelLine,
     "- Threads run in this folder and reach the context folders and repositories by their absolute paths.",
     "- Follow threads with `t3_thread_list`, `t3_thread_read` and `t3_thread_wait`; continue one with `t3_thread_send`. Link a thread for the user as `[title](t3-thread://v1/<threadId>)`.",

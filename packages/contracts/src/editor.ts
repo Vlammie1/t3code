@@ -162,6 +162,10 @@ export const LaunchEditorInput = Schema.Struct({
       honored by the "file-manager" editor; clients must check the server's
       `shellRevealInFileManager` config flag before sending this. */
   reveal: Schema.optional(Schema.Boolean),
+  /** Put the file `cwd` itself on the server machine's clipboard, as a file
+      manager copy does. Only honored by the "file-manager" editor; clients send
+      it only for an environment on their own machine. */
+  copyToClipboard: Schema.optional(Schema.Boolean),
 });
 export type LaunchEditorInput = typeof LaunchEditorInput.Type;
 
@@ -298,7 +302,23 @@ export class ExternalLauncherEditorSpawnError extends Schema.TaggedError<Externa
   }
 }
 
+export class ExternalLauncherClipboardError extends Schema.TaggedError<ExternalLauncherClipboardError>()(
+  "ExternalLauncherClipboardError",
+  {
+    path: Schema.String,
+    reason: Schema.Literals(["unsupported-platform", "failed"]),
+    cause: Schema.optional(Schema.Defect()),
+  },
+) {
+  override get message(): string {
+    return this.reason === "unsupported-platform"
+      ? "Copying files to the clipboard is not supported on this machine."
+      : `Could not copy '${this.path}' to the clipboard.`;
+  }
+}
+
 export const ExternalLauncherError = Schema.Union([
+  ExternalLauncherClipboardError,
   ExternalLauncherUnknownEditorError,
   ExternalLauncherUnsupportedEditorError,
   ExternalLauncherCommandNotFoundError,

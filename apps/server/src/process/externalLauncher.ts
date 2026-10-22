@@ -1,5 +1,6 @@
 import {
   EDITORS,
+  ExternalLauncherClipboardError,
   ExternalLauncherError,
   ExternalLauncherBrowserSpawnError,
   ExternalLauncherCommandNotFoundError,
@@ -498,6 +499,70 @@ export class ExternalLauncher extends Context.Service<
   }
 >()("t3/process/externalLauncher") {}
 
+function appleScriptStringLiteral(input: string): string {
+  return `"${input.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
+}
+
+/**
+ * Windows and macOS put a file on the clipboard the way their file manager
+ * does, so it pastes as a file into Explorer, Finder, mail and chat apps.
+ * Linux has no common tool for that, so it is not offered there.
+ */
+export function clipboardFileCopyCommand(
+  path: string,
+  platform: NodeJS.Platform,
+  env: NodeJS.ProcessEnv,
+): { readonly command: string; readonly args: ReadonlyArray<string> } | null {
+  if (platform === "win32") {
+    return {
+      command: resolvePowerShellPath(env),
+      args: [
+        ...POWERSHELL_ARGUMENTS_PREFIX,
+        encodeUtf16LeBase64(
+          `$ErrorActionPreference = 'Stop'; Set-Clipboard -LiteralPath ${escapePowerShellStringLiteral(path)}`,
+        ),
+      ],
+    };
+  }
+  if (platform === "darwin") {
+    return {
+      command: "osascript",
+      args: ["-e", `set the clipboard to (POSIX file ${appleScriptStringLiteral(path)})`],
+    };
+  }
+  return null;
+}
+
+const copyFileToClipboard = Effect.fn("externalLauncher.copyFileToClipboard")(function* (
+  path: string,
+): Effect.fn.Return<void, ExternalLauncherError, ChildProcessSpawner.ChildProcessSpawner> {
+  const platform = yield* HostProcess.Platform;
+  const env = yield* HostProcess.Environment;
+  const launch = clipboardFileCopyCommand(path, platform, env);
+  if (launch === null) {
+    return yield* new ExternalLauncherClipboardError({ path, reason: "unsupported-platform" });
+  }
+  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+  const exitCode = yield* spawner
+    .spawn(
+      ChildProcess.make(launch.command, launch.args, {
+        stdin: "ignore",
+        stdout: "ignore",
+        stderr: "ignore",
+      }),
+    )
+    .pipe(
+      Effect.flatMap((handle) => handle.exitCode),
+      Effect.scoped,
+      Effect.mapError(
+        (cause) => new ExternalLauncherClipboardError({ path, reason: "failed", cause }),
+      ),
+    );
+  if (exitCode !== 0) {
+    return yield* new ExternalLauncherClipboardError({ path, reason: "failed" });
+  }
+});
+
 const resolveEditorLaunch = Effect.fn("resolveEditorLaunch")(function* (
   input: LaunchEditorInput,
 ): Effect.fn.Return<
@@ -817,8 +882,11 @@ export const make = Effect.gen(function* () {
         Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
       ),
     launchEditor: (input) =>
-      provideCommandResolutionServices(
-        Effect.flatMap(resolveEditorLaunch(input), launchEditorProcess),
+      (input.editor === "file-manager" && input.copyToClipboard === true
+        ? copyFileToClipboard(input.cwd)
+        : provideCommandResolutionServices(
+            Effect.flatMap(resolveEditorLaunch(input), launchEditorProcess),
+          )
       ).pipe(Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner)),
   });
 });

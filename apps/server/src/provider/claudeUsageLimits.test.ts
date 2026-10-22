@@ -169,6 +169,39 @@ describe("claudeRateLimitEventToUpdate", () => {
     });
   });
 
+  it("reads every window the current CLI reports under unifiedWindows", () => {
+    // Recorded from Claude Code: utilization moved off the event into one entry per window.
+    const event = {
+      status: "allowed",
+      resetsAt: 1_792_679_400,
+      rateLimitType: "five_hour",
+      unifiedWindows: {
+        five_hour: { utilization: 0.13, resetsAt: 1_792_679_400 },
+        seven_day: { utilization: 0.13, resetsAt: 1_793_185_200 },
+      },
+    } as const;
+    expect(claudeRateLimitEventToUpdate(event, noNames)).toEqual({
+      windows: [
+        {
+          id: "five_hour",
+          kind: "session",
+          label: "Session",
+          usedPercent: 13,
+          windowDurationMins: 300,
+          resetsAt: "2026-10-22T14:30:00.000Z",
+        },
+        {
+          id: "seven_day",
+          kind: "weekly",
+          label: "Weekly",
+          usedPercent: 13,
+          windowDurationMins: 10080,
+          resetsAt: "2026-10-28T11:00:00.000Z",
+        },
+      ],
+    });
+  });
+
   it("ignores windows the page does not render and events without a utilization", () => {
     expect(
       claudeRateLimitEventToUpdate(

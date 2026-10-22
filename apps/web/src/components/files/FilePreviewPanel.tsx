@@ -37,7 +37,15 @@ import {
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
 import { mediaFileReference } from "@t3tools/client-runtime/media-reference";
-import { Code2, Eye, FolderTree, Globe2, Table2, WrapTextIcon } from "~/components/appIcons";
+import {
+  Code2,
+  CopyIcon,
+  Eye,
+  FolderTree,
+  Globe2,
+  Table2,
+  WrapTextIcon,
+} from "~/components/appIcons";
 import * as Schema from "effect/Schema";
 import { useEffect, useRef, useState } from "react";
 
@@ -81,7 +89,14 @@ import { BrowserDocumentFrame, isPdfPreviewFile } from "./BrowserDocumentFrame";
 import { DelimitedTablePreview } from "./DelimitedTablePreview";
 import FileBrowserPanel from "./FileBrowserPanel";
 import { FileBreadcrumbs } from "./FileBreadcrumbs";
-import { breadcrumbPathOf, retainedBreadcrumbTrail, trailChildOf } from "./filePath";
+import { FileExplorerRootPicker } from "./FileExplorerRootPicker";
+import { useCopyFile } from "./useCopyFile";
+import {
+  breadcrumbPathOf,
+  hostPathRelativeTo,
+  retainedBreadcrumbTrail,
+  trailChildOf,
+} from "./filePath";
 import { MarkdownDocumentSurface } from "./MarkdownDocumentSurface";
 import {
   type FileCommentAnnotationEntry,
@@ -119,10 +134,16 @@ import {
   useProjectFileQuery,
 } from "./projectFilesQueryState";
 
+export interface FileExplorerRoot {
+  readonly name: string;
+  readonly path: string;
+}
+
 interface FilePreviewPanelProps {
   environmentId: EnvironmentId;
   cwd: string;
   projectName: string;
+  extraRoots?: ReadonlyArray<FileExplorerRoot>;
   relativePath: string | null;
   attachment?: ChatFileAttachment;
   threadRef: ScopedThreadRef;
@@ -917,6 +938,7 @@ export default function FilePreviewPanel({
   environmentId,
   cwd,
   projectName,
+  extraRoots = [],
   relativePath: requestedPath,
   attachment,
   threadRef,
@@ -1022,6 +1044,9 @@ export default function FilePreviewPanel({
   // Everything preview-related keys off previewPath; a folder has no preview.
   const previewPath = isFolder ? null : relativePath;
   const [explorerOpen, setExplorerOpen] = useState(initialExplorerOpen);
+  // null is the workspace itself; the others browse as host folders, read-only.
+  const [explorerRootPath, setExplorerRootPath] = useState<string | null>(null);
+  const explorerRoot = extraRoots.find((root) => root.path === explorerRootPath) ?? null;
   const showExplorer = shouldShowFileExplorer({
     relativePath: previewPath,
     explorerOpen,
@@ -1098,6 +1123,7 @@ export default function FilePreviewPanel({
       : relativePath && attachment === undefined
         ? resolvePathLinkTarget(relativePath, cwd)
         : null;
+  const copyFile = useCopyFile(environmentId);
   const onFilePostRender = useFileLineReveal(relativePath, revealLine, revealRequestId);
   useWorkspaceMutationRefresh({
     enabled:
@@ -1238,6 +1264,14 @@ export default function FilePreviewPanel({
               onPress={() => updateClientSettings({ wordWrap: !wordWrap })}
             >
               <WrapTextIcon className="size-3.5" />
+            </FileSurfaceAction>
+          ) : null}
+          {previewPath !== null && absolutePath !== null ? (
+            <FileSurfaceAction
+              label="Copy file"
+              onPress={() => void copyFile({ cwd, absolutePath })}
+            >
+              <CopyIcon className="size-3.5" />
             </FileSurfaceAction>
           ) : null}
           {canOpenInBrowser ? (
@@ -1409,22 +1443,34 @@ export default function FilePreviewPanel({
         {showExplorer ? (
           <aside
             className={cn(
-              "flex min-h-0 shrink-0 bg-background",
+              "flex min-h-0 shrink-0 flex-col bg-background",
               previewPath
                 ? "w-[min(22rem,46%)] min-w-64 border-l border-border/60"
                 : "min-w-0 flex-1",
             )}
           >
+            {extraRoots.length > 0 && hostFolderPath === null ? (
+              <FileExplorerRootPicker
+                projectName={projectName}
+                roots={extraRoots}
+                value={explorerRoot?.path ?? null}
+                onChange={setExplorerRootPath}
+              />
+            ) : null}
             <FileBrowserPanel
-              key={`${environmentId}:${hostFolderPath ?? cwd}`}
+              key={`${environmentId}:${hostFolderPath ?? explorerRoot?.path ?? cwd}`}
               environmentId={environmentId}
-              cwd={hostFolderPath ?? cwd}
-              projectName={hostFolderPath ?? projectName}
-              hostFolder={hostFolderPath !== null}
+              cwd={hostFolderPath ?? explorerRoot?.path ?? cwd}
+              projectName={hostFolderPath ?? explorerRoot?.name ?? projectName}
+              hostFolder={hostFolderPath !== null || explorerRoot !== null}
               selectedPath={
-                hostFolderPath === null
-                  ? relativePath
-                  : trailChildOf(hostFolderPath, breadcrumbTrail ?? hostFolderPath)
+                hostFolderPath !== null
+                  ? trailChildOf(hostFolderPath, breadcrumbTrail ?? hostFolderPath)
+                  : explorerRoot !== null
+                    ? relativePath === null
+                      ? null
+                      : hostPathRelativeTo(explorerRoot.path, relativePath)
+                    : relativePath
               }
               selectedPathRevealId={revealRequestId}
               onOpenFile={onOpenFile}

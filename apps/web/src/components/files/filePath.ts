@@ -68,6 +68,22 @@ export function trailChildOf(folder: string, trail: string): string | null {
 }
 
 /**
+ * The listing path (with `/`) of host path `path` inside host folder `folder`,
+ * or null when it lies elsewhere. Windows paths compare case-insensitively.
+ */
+export function hostPathRelativeTo(folder: string, path: string): string | null {
+  const windows = isWindowsAbsolutePath(folder);
+  const normalize = (value: string) => {
+    const slashed = value.replaceAll("\\", "/").replace(/\/+$/, "");
+    return windows ? slashed.toLowerCase() : slashed;
+  };
+  const base = normalize(folder);
+  const target = normalize(path);
+  if (!target.startsWith(`${base}/`)) return null;
+  return path.replaceAll("\\", "/").slice(base.length + 1);
+}
+
+/**
  * A host path for `relativePath` (as a host folder's listing names it, with `/`)
  * inside host folder `folder`, using the folder's own separator.
  */
