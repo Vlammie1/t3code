@@ -2221,6 +2221,9 @@ export default function ChatView(props: ChatViewProps) {
       : clampFileAttachmentUploadBytes(advertisedFileAttachmentBytes);
   const envLocked = Boolean(activeThread && (activeMessageCount > 0 || activeRuntime !== null));
 
+  const autoShowFloatingPreview = useClientSettings(
+    (settings) => settings.browserAutoShowFloatingPreview,
+  );
   const loadBalancingSettings = useClientSettings((settings) => ({
     loadBalancingEnabled: settings.loadBalancingEnabled,
     loadBalancingWeights: settings.loadBalancingWeights,
@@ -2941,23 +2944,37 @@ export default function ChatView(props: ChatViewProps) {
   /**
    * File tools are explicit; completed commands are included because a shell
    * command can mutate the workspace without reporting the paths it touched.
+   * An open file also re-reads after any other tool, such as an MCP write or a
+   * subagent, because those do not say which paths they touched either; that
+   * costs one read of one file, unlike git status and directory listings.
    */
-  const workspaceMutationId = (() => {
-    let itemId: string | null = null;
-    for (let index = serverVisibleTurnItems.length - 1; index >= 0; index -= 1) {
+  const { workspaceMutationId, fileContentRevision } = (() => {
+    let mutationItemId: string | null = null;
+    let toolItemId: string | null = null;
+    for (
+      let index = serverVisibleTurnItems.length - 1;
+      index >= 0 && mutationItemId === null;
+      index -= 1
+    ) {
       const item = serverVisibleTurnItems[index]?.item;
       if (!item) continue;
-      if (item.type !== "command_execution" && item.type !== "file_change") continue;
       if (item.status === "pending" || item.status === "running" || item.status === "waiting") {
         continue;
       }
-      itemId = item.id;
-      break;
+      const mutation = item.type === "command_execution" || item.type === "file_change";
+      if (!mutation && item.type !== "dynamic_tool" && item.type !== "subagent") continue;
+      toolItemId ??= item.id;
+      if (mutation) mutationItemId = item.id;
     }
     const latestCheckpointCompletedAt = turnDiffSummaries.at(-1)?.completedAt ?? null;
-    return itemId === null && latestCheckpointCompletedAt === null
-      ? null
-      : JSON.stringify([itemId, latestCheckpointCompletedAt]);
+    const revision = (itemId: string | null) =>
+      itemId === null && latestCheckpointCompletedAt === null
+        ? null
+        : JSON.stringify([itemId, latestCheckpointCompletedAt]);
+    return {
+      workspaceMutationId: revision(mutationItemId),
+      fileContentRevision: revision(toolItemId),
+    };
   })();
 
   const gitCwd = activeProject
@@ -3800,14 +3817,16 @@ export default function ChatView(props: ChatViewProps) {
   });
   const closePreviewPanel = () => {
     if (activeThreadRef) {
-      if (activeRightPanelSurface?.kind === "preview" && activeRightPanelSurface.resourceId) {
+      // Closing hands the tab to the floating preview only for users who want floating previews.
+      const floating = autoShowFloatingPreview ? activeRightPanelSurface : null;
+      if (floating?.kind === "preview" && floating.resourceId) {
         usePreviewMiniPlayerStore
           .getState()
-          .open(activeThreadRef, browserMiniPlayerSource(activeRightPanelSurface.resourceId));
-      } else if (activeRightPanelSurface?.kind === "device" && activeRightPanelSurface.target) {
+          .open(activeThreadRef, browserMiniPlayerSource(floating.resourceId));
+      } else if (floating?.kind === "device" && floating.target) {
         usePreviewMiniPlayerStore
           .getState()
-          .open(activeThreadRef, { kind: "device", ...activeRightPanelSurface.target });
+          .open(activeThreadRef, { kind: "device", ...floating.target });
       }
       useRightPanelStore.getState().setMaximized(activeThreadRef, false);
       useRightPanelStore.getState().close(activeThreadRef);
@@ -7858,6 +7877,7 @@ export default function ChatView(props: ChatViewProps) {
       keybindings={keybindings}
       configuredPreviewUrls={configuredPreviewUrls}
       workspaceMutationId={workspaceMutationId}
+      fileContentRevision={fileContentRevision}
       getShortcutContext={getShortcutContextStable}
       onSendAnnotation={sendPreviewAnnotationStable}
       onCloseSurface={closeRightPanelSurface}

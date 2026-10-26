@@ -89,7 +89,7 @@ import { BrowserDocumentFrame, isPdfPreviewFile } from "./BrowserDocumentFrame";
 import { DelimitedTablePreview } from "./DelimitedTablePreview";
 import FileBrowserPanel from "./FileBrowserPanel";
 import { FileBreadcrumbs } from "./FileBreadcrumbs";
-import { FileExplorerRootPicker } from "./FileExplorerRootPicker";
+import { FileExplorerSection } from "./FileExplorerSection";
 import { useCopyFile } from "./useCopyFile";
 import {
   breadcrumbPathOf,
@@ -160,6 +160,8 @@ interface FilePreviewPanelProps {
   onPendingChange: (relativePath: string, pending: boolean) => void;
   selectedFilePending: boolean;
   workspaceMutationId: string | null;
+  /** Changes after any settled tool, not only the ones known to write. */
+  fileContentRevision: string | null;
 }
 
 const FILE_EXPLORER_STORAGE_KEY = "t3code.fileExplorerOpen";
@@ -180,8 +182,11 @@ function WorkspaceImagePreview(props: {
   readonly alt: string;
   readonly workspaceMutationId: string | null;
 }) {
+  // An image from a context folder or a chat link outside the project is a host file, not a workspace one.
+  const insideWorkspace =
+    mediaFileReference(props.absolutePath, props.workspaceRoot).relativePath !== undefined;
   const resource = workspaceAssetResource({
-    kind: "workspace-file",
+    kind: insideWorkspace ? "workspace-file" : "media-file",
     threadRef: props.threadRef,
     draft: props.draft,
     workspaceRoot: props.workspaceRoot,
@@ -206,7 +211,7 @@ function WorkspaceImagePreview(props: {
     return (
       <MediaActions source={actionsSource}>
         <div className="flex min-h-0 flex-1 items-center justify-center px-6 text-center text-xs leading-relaxed text-destructive">
-          Unable to load workspace image.
+          Unable to load image.
         </div>
       </MediaActions>
     );
@@ -953,6 +958,7 @@ export default function FilePreviewPanel({
   onPendingChange,
   selectedFilePending,
   workspaceMutationId,
+  fileContentRevision,
 }: FilePreviewPanelProps) {
   const relativePath =
     attachment === undefined ? resolveFilePreviewPath(requestedPath, cwd) : requestedPath;
@@ -1044,13 +1050,21 @@ export default function FilePreviewPanel({
   // Everything preview-related keys off previewPath; a folder has no preview.
   const previewPath = isFolder ? null : relativePath;
   const [explorerOpen, setExplorerOpen] = useState(initialExplorerOpen);
-  // null is the workspace itself; the others browse as host folders, read-only.
-  const [explorerRootPath, setExplorerRootPath] = useState<string | null>(null);
-  const explorerRoot = extraRoots.find((root) => root.path === explorerRootPath) ?? null;
+  // The workspace and the other folders the thread reads stack in one explorer; the others browse as host folders.
+  const [collapsedRoots, setCollapsedRoots] = useState<ReadonlySet<string>>(() => new Set());
+  const toggleRoot = (path: string) =>
+    setCollapsedRoots((current) => {
+      const next = new Set(current);
+      if (!next.delete(path)) next.add(path);
+      return next;
+    });
   const showExplorer = shouldShowFileExplorer({
     relativePath: previewPath,
     explorerOpen,
     attachmentOpen: attachment !== undefined,
+    inExtraRoot:
+      previewPath !== null &&
+      extraRoots.some((root) => hostPathRelativeTo(root.path, previewPath) !== null),
   });
   // A markdown file always opens as a document; the source view is a per-file detour.
   const [markdownSourcePath, setMarkdownSourcePath] = useState<string | null>(null);
@@ -1125,16 +1139,25 @@ export default function FilePreviewPanel({
         : null;
   const copyFile = useCopyFile(environmentId);
   const onFilePostRender = useFileLineReveal(relativePath, revealLine, revealRequestId);
+  const rereadContents =
+    attachment === undefined &&
+    relativePath !== null &&
+    // Media and PDFs never show their contents, so re-reading them on every
+    // workspace mutation is waste. A folder named like one still re-reads, so
+    // it notices when the path becomes a file.
+    (isFolder || (!isMedia && !isPdf)) &&
+    !selectedFilePending;
+  // Coming back to the window is when an edit from your own editor or terminal shows up.
+  const refreshFile = file.refresh;
+  useEffect(() => {
+    if (!rereadContents) return;
+    window.addEventListener("focus", refreshFile);
+    return () => window.removeEventListener("focus", refreshFile);
+  }, [rereadContents, refreshFile]);
   useWorkspaceMutationRefresh({
-    enabled:
-      attachment === undefined &&
-      relativePath !== null &&
-      // Media and PDFs never show their contents, so re-reading them on every
-      // workspace mutation is waste. A folder named like one still re-reads, so
-      // it notices when the path becomes a file.
-      (isFolder || (!isMedia && !isPdf)) &&
-      !selectedFilePending,
-    mutationId: workspaceMutationId,
+    enabled: rereadContents,
+    // Without any activity yet this still re-reads once on open: a cached copy can be minutes old.
+    mutationId: fileContentRevision ?? "opened",
     refresh: file.refresh,
     resourceKey: `file:${environmentId}:${cwd}:${relativePath ?? ""}`,
   });
@@ -1449,36 +1472,64 @@ export default function FilePreviewPanel({
                 : "min-w-0 flex-1",
             )}
           >
-            {extraRoots.length > 0 && hostFolderPath === null ? (
-              <FileExplorerRootPicker
-                projectName={projectName}
-                roots={extraRoots}
-                value={explorerRoot?.path ?? null}
-                onChange={setExplorerRootPath}
+            {hostFolderPath !== null ? (
+              <FileBrowserPanel
+                key={`${environmentId}:${hostFolderPath}`}
+                environmentId={environmentId}
+                cwd={hostFolderPath}
+                projectName={hostFolderPath}
+                hostFolder
+                selectedPath={trailChildOf(hostFolderPath, breadcrumbTrail ?? hostFolderPath)}
+                selectedPathRevealId={revealRequestId}
+                onOpenFile={onOpenFile}
+                workspaceMutationId={workspaceMutationId}
               />
-            ) : null}
-            <FileBrowserPanel
-              key={`${environmentId}:${hostFolderPath ?? explorerRoot?.path ?? cwd}`}
-              environmentId={environmentId}
-              cwd={hostFolderPath ?? explorerRoot?.path ?? cwd}
-              projectName={hostFolderPath ?? explorerRoot?.name ?? projectName}
-              hostFolder={hostFolderPath !== null || explorerRoot !== null}
-              selectedPath={
-                hostFolderPath !== null
-                  ? trailChildOf(hostFolderPath, breadcrumbTrail ?? hostFolderPath)
-                  : explorerRoot !== null
-                    ? relativePath === null
-                      ? null
-                      : hostPathRelativeTo(explorerRoot.path, relativePath)
-                    : relativePath
-              }
-              selectedPathRevealId={revealRequestId}
-              onOpenFile={onOpenFile}
-              workspaceMutationId={workspaceMutationId}
-              {...(previewPath && !isMedia && !isPdf
-                ? { onRefreshSelectedFile: file.refresh }
-                : {})}
-            />
+            ) : extraRoots.length === 0 ? (
+              <FileBrowserPanel
+                key={`${environmentId}:${cwd}`}
+                environmentId={environmentId}
+                cwd={cwd}
+                projectName={projectName}
+                selectedPath={relativePath}
+                selectedPathRevealId={revealRequestId}
+                onOpenFile={onOpenFile}
+                workspaceMutationId={workspaceMutationId}
+                {...(previewPath && !isMedia && !isPdf
+                  ? { onRefreshSelectedFile: file.refresh }
+                  : {})}
+              />
+            ) : (
+              [{ name: projectName, path: cwd }, ...extraRoots].map((root, index) => (
+                <FileExplorerSection
+                  key={`${environmentId}:${root.path}`}
+                  name={root.name}
+                  expanded={!collapsedRoots.has(root.path)}
+                  onToggle={() => toggleRoot(root.path)}
+                >
+                  <FileBrowserPanel
+                    environmentId={environmentId}
+                    cwd={root.path}
+                    projectName={root.name}
+                    hostFolder={index > 0}
+                    selectedPath={
+                      relativePath === null
+                        ? null
+                        : index > 0
+                          ? hostPathRelativeTo(root.path, relativePath)
+                          : isAbsolutePath(relativePath)
+                            ? null
+                            : relativePath
+                    }
+                    selectedPathRevealId={revealRequestId}
+                    onOpenFile={onOpenFile}
+                    workspaceMutationId={workspaceMutationId}
+                    {...(previewPath && !isMedia && !isPdf
+                      ? { onRefreshSelectedFile: file.refresh }
+                      : {})}
+                  />
+                </FileExplorerSection>
+              ))
+            )}
           </aside>
         ) : null}
       </div>

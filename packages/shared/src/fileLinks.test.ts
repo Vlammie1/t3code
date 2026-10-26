@@ -56,7 +56,7 @@ describe("resolvePathLinkTarget", () => {
     [
       String.raw`.\src\index.ts:12`,
       String.raw`\\server\share\project`,
-      String.raw`\\server\share\project\.\src\index.ts:12`,
+      String.raw`\\server\share\project\src\index.ts:12`,
     ],
     [
       String.raw`~\index.ts:12`,
@@ -75,6 +75,16 @@ describe("resolvePathLinkTarget", () => {
         "/Users/julius/project",
       ),
     ).toBe("/Users/julius/project/src/components/ThreadTerminalDrawer.tsx:42:7");
+  });
+
+  it("resolves a link to a sibling folder to its real path", () => {
+    expect(resolvePathLinkTarget("../Lockspace/src/App.tsx:3", "/code/Coord")).toBe(
+      "/code/Lockspace/src/App.tsx:3",
+    );
+    expect(resolvePathLinkTarget(String.raw`..\Lockspace\App.tsx`, String.raw`C:\code\Coord`)).toBe(
+      String.raw`C:\code\Lockspace\App.tsx`,
+    );
+    expect(resolvePathLinkTarget("../../../etc/hosts", "/code")).toBe("/etc/hosts");
   });
 
   it("keeps absolute paths unchanged", () => {

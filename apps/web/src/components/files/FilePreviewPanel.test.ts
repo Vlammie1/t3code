@@ -138,6 +138,17 @@ describe("shouldShowFileExplorer", () => {
     ).toBe(false);
   });
 
+  it("keeps the explorer for a file from one of the thread's other folders", () => {
+    expect(
+      shouldShowFileExplorer({
+        relativePath: "/code/Lockspace/src/App.tsx",
+        explorerOpen: true,
+        attachmentOpen: false,
+        inExtraRoot: true,
+      }),
+    ).toBe(true);
+  });
+
   it("keeps the saved explorer preference for workspace files", () => {
     expect(
       shouldShowFileExplorer({

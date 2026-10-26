@@ -971,7 +971,7 @@ export function DeviceIntegrationControls({
   );
 }
 
-function BrowserAutoShowFloatingPreviewSetting({ disabled }: { readonly disabled: boolean }) {
+function BrowserAutoShowFloatingPreviewSetting() {
   const autoShow = useClientSettings((settings) => settings.browserAutoShowFloatingPreview);
   const updateSettings = useUpdatePrimarySettings();
 
@@ -980,7 +980,7 @@ function BrowserAutoShowFloatingPreviewSetting({ disabled }: { readonly disabled
       {...searchableSetting("browser-auto-show-floating-preview")}
       description="Show the floating preview when an agent opens a browser or device unless the agent says otherwise."
       resetAction={
-        !disabled && autoShow !== DEFAULT_BROWSER_AUTO_SHOW_FLOATING_PREVIEW ? (
+        autoShow !== DEFAULT_BROWSER_AUTO_SHOW_FLOATING_PREVIEW ? (
           <SettingResetButton
             label="auto-show floating preview"
             onClick={() =>
@@ -993,7 +993,6 @@ function BrowserAutoShowFloatingPreviewSetting({ disabled }: { readonly disabled
       }
       control={
         <Switch
-          disabled={disabled}
           checked={autoShow}
           onCheckedChange={(checked) =>
             updateSettings({ browserAutoShowFloatingPreview: Boolean(checked) })
@@ -1479,7 +1478,6 @@ export function IntegrationsSettingsPanel() {
       <BrowserRecordingFrameRateSetting disabled={previewDefaultsDisabled} />
       <BrowserRecordingInputSettings disabled={previewDefaultsDisabled} />
       <BrowserLinkTargetSetting disabled={previewDefaultsDisabled} />
-      <BrowserAutoShowFloatingPreviewSetting disabled={previewDefaultsDisabled} />
     </>
   );
 
@@ -1494,6 +1492,8 @@ export function IntegrationsSettingsPanel() {
         ) : (
           previewDefaults
         )}
+        {/* Floating previews also show on the web, so this one is not a desktop-only default. */}
+        <BrowserAutoShowFloatingPreviewSetting />
         <PullRequestLinksOpenInAppSetting />
       </SettingsSection>
       <DeviceIntegrationSettings />

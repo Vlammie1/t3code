@@ -64,9 +64,25 @@ function isWindowsPathStyle(value: string): boolean {
 function joinPath(base: string, next: string, separator: "/" | "\\"): string {
   const cleanBase = base.replace(/[\\/]+$/, "");
   if (separator === "\\") {
-    return `${cleanBase}\\${next.replaceAll("/", "\\")}`;
+    return collapseDotSegments(`${cleanBase}\\${next.replaceAll("/", "\\")}`, separator);
   }
-  return `${cleanBase}/${next.replace(/^\/+/, "")}`;
+  return collapseDotSegments(`${cleanBase}/${next.replace(/^\/+/, "")}`, separator);
+}
+
+// A link such as `../Lockspace/src/App.tsx` has to leave the workspace as a real path: left as
+// `<cwd>/../Lockspace/...` it still looks workspace-relative, and the server refuses `..` there.
+function collapseDotSegments(path: string, separator: "/" | "\\"): string {
+  const segments = path.split(separator);
+  // The root stays: the empty segment before `/`, a drive such as `C:`, or a UNC `\\server\share`.
+  const rootLength = path.startsWith(separator.repeat(2)) ? 4 : 1;
+  const kept = segments.slice(0, rootLength);
+  for (const segment of segments.slice(rootLength)) {
+    if (segment === ".") continue;
+    if (segment !== "..") kept.push(segment);
+    else if (kept.length > rootLength && kept.at(-1) !== "..") kept.pop();
+    else if (!isAbsolutePath(path)) kept.push(segment);
+  }
+  return kept.join(separator);
 }
 
 function inferHomeFromCwd(cwd: string): string | undefined {

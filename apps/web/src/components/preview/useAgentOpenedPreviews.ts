@@ -123,10 +123,13 @@ export function useAgentOpenedPreviews(input: {
       );
       if (surface && requested?.force === true) {
         useRightPanelStore.getState().activateSurface(threadRef, surface.id);
-      } else if (!surface) {
+      } else if (!surface && autoShowFloatingPreview) {
         usePreviewMiniPlayerStore
           .getState()
           .open(threadRef, browserMiniPlayerSource(session.tabId));
+      } else if (!surface) {
+        // A forced reveal with floating previews off opens the real panel instead.
+        useRightPanelStore.getState().openBrowser(threadRef, session.tabId);
       }
     }
   }, [

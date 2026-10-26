@@ -108,9 +108,9 @@ describe("relative links inside a rendered host file", () => {
     });
     expect(
       resolveInlineCodeFileLinkMeta("./src/index.ts", "/repo", "/repo/packages/a"),
-    ).toMatchObject({ filePath: "/repo/packages/a/./src/index.ts" });
+    ).toMatchObject({ filePath: "/repo/packages/a/src/index.ts" });
     expect(resolveInlineCodeFileLinkMeta("../b/notes.md", "/repo", "/repo/docs/a")).toMatchObject({
-      filePath: "/repo/docs/a/../b/notes.md",
+      filePath: "/repo/docs/b/notes.md",
     });
   });
 

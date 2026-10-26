@@ -31,10 +31,11 @@ export function shouldShowFileExplorer(input: {
   readonly relativePath: string | null;
   readonly explorerOpen: boolean;
   readonly attachmentOpen: boolean;
+  /** A host file inside one of the thread's other folders, which the explorer lists too. */
+  readonly inExtraRoot?: boolean;
 }): boolean {
-  if (input.attachmentOpen || (input.relativePath && isAbsolutePath(input.relativePath))) {
-    return false;
-  }
+  if (input.attachmentOpen) return false;
+  if (input.relativePath && isAbsolutePath(input.relativePath) && !input.inExtraRoot) return false;
   return input.explorerOpen || input.relativePath === null;
 }
 

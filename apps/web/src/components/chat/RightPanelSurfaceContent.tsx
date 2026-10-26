@@ -72,6 +72,7 @@ interface RightPanelSurfaceContentProps {
   readonly keybindings: ResolvedKeybindingsConfig;
   readonly configuredPreviewUrls: ReadonlyArray<string>;
   readonly workspaceMutationId: string | null;
+  readonly fileContentRevision: string | null;
   readonly getShortcutContext: () => ShortcutMatchContext;
   readonly onSendAnnotation: (
     annotation: PreviewAnnotationPayload,
@@ -238,6 +239,7 @@ function ShownSurfaceContent(props: RightPanelSurfaceContentProps) {
             onPendingChange={files.onPendingChange}
             selectedFilePending={surface.kind === "file" && files.pendingSurfaceIds.has(surface.id)}
             workspaceMutationId={props.workspaceMutationId}
+            fileContentRevision={props.fileContentRevision}
           />
         </Suspense>
       );
