@@ -12,12 +12,13 @@ import { codexAuthDeliveryUrl, readCodexAuthHandoff } from "@t3tools/shared/code
 import { receiveCodexAuthCallback, CodexAuthCallbackError } from "./CodexAuthCallback.ts";
 import * as ElectronShell from "../electron/ElectronShell.ts";
 import { providerAuthReturnUrl } from "@t3tools/shared/providerAuthReturnUrl";
-import { promptLinkAppPath } from "@t3tools/shared/promptLinks";
+import { appThreadLinkThreadId, promptLinkAppPath } from "@t3tools/shared/promptLinks";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import { clerkFrontendApiHostnameFromPublishableKey } from "@t3tools/shared/relayAuth";
 import * as ElectronApp from "../electron/ElectronApp.ts";
 import * as ElectronProtocol from "../electron/ElectronProtocol.ts";
 import * as ElectronWindow from "../electron/ElectronWindow.ts";
+import * as DesktopDevProtocolClient from "./DesktopDevProtocolClient.ts";
 import * as DesktopUserData from "./DesktopUserData.ts";
 import * as DesktopEnvironment from "./DesktopEnvironment.ts";
 import * as DesktopWebLinks from "./DesktopWebLinks.ts";
@@ -112,6 +113,15 @@ export const make = Effect.gen(function* () {
     return yield* Effect.interrupt;
   }
 
+  const launchArgs = yield* HostProcess.Arguments;
+  // A dev protocol client that got the lock found no running dev app. Without
+  // the dev runner there is no dev server to load, so starting here would only
+  // show a broken window.
+  if (environment.isDevelopment && DesktopDevProtocolClient.isDevProtocolClientLaunch(launchArgs)) {
+    yield* electronApp.quit;
+    return yield* Effect.interrupt;
+  }
+
   // Retain launch arguments while asynchronous startup builds the application runtime.
   const pendingSecondInstances: Array<readonly string[]> = [];
   let handleSecondInstance = (argv: readonly string[]) => {
@@ -142,6 +152,24 @@ export const make = Effect.gen(function* () {
           }),
       }).pipe(Effect.orDie),
   );
+
+  // The bridge registers the scheme with the bare executable. Unpackaged on
+  // Windows that opens Electron's default app, so point it at this app's entry.
+  if (
+    environment.platform === "win32" &&
+    !environment.isPackaged &&
+    Option.isSome(environment.devServerUrl)
+  ) {
+    yield* electronApp.setAsDefaultProtocolClient(
+      ElectronProtocol.getDesktopScheme(environment.isDevelopment),
+      yield* HostProcess.ExecutablePath,
+      DesktopDevProtocolClient.devProtocolClientArgs({
+        dirname: environment.dirname,
+        joinPath: environment.path.join,
+        devServerUrl: environment.devServerUrl.value,
+      }),
+    );
+  }
 
   return DesktopClerk.of({
     configure: Effect.gen(function* () {
@@ -196,7 +224,8 @@ export const make = Effect.gen(function* () {
         return true;
       };
       const openAppLink = (value: string | undefined) => {
-        if (!value || promptLinkAppPath(value) === null) return false;
+        if (!value || (promptLinkAppPath(value) === null && appThreadLinkThreadId(value) === null))
+          return false;
         void runPromise(webLinks.receive(value));
         return true;
       };

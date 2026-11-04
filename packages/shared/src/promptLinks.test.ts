@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  appThreadLinkThreadId,
   buildNewThreadLink,
   parseNewThreadLink,
   parseThreadLinkPrompt,
@@ -115,6 +116,18 @@ describe("link round trips", () => {
     expect(promptLinkAppPath("https://app.t3.codes/settings/general")).toBeNull();
     expect(promptLinkAppPath("https://evil.test/new?prompt=hi")).toBeNull();
     expect(promptLinkAppPath("t3code://app/index.html")).toBeNull();
+  });
+
+  it("reads a local thread link that names only the thread", () => {
+    expect(appThreadLinkThreadId("t3code://thread/thread-1")).toBe("thread-1");
+    expect(appThreadLinkThreadId("t3code-dev://thread/thread-1/")).toBe("thread-1");
+    expect(promptLinkAppPath("t3code-dev://thread/thread-1")).toBeNull();
+    expect(appThreadLinkThreadId("t3code://thread/")).toBeNull();
+    expect(appThreadLinkThreadId("t3code://thread/a/b")).toBeNull();
+    expect(appThreadLinkThreadId("t3code://thread/a%2Fb")).toBeNull();
+    expect(appThreadLinkThreadId("t3code://thread/%E0%A4%A")).toBeNull();
+    expect(appThreadLinkThreadId("t3code://threads/env-1/thread-1")).toBeNull();
+    expect(appThreadLinkThreadId("https://app.t3.codes/thread/thread-1")).toBeNull();
   });
 
   it("hands an in-app path to the installed app", () => {

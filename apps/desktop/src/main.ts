@@ -39,6 +39,7 @@ import * as DesktopWebLinks from "./app/DesktopWebLinks.ts";
 import * as DesktopAppIdentity from "./app/DesktopAppIdentity.ts";
 import * as DesktopConnectionCatalogStore from "./app/DesktopConnectionCatalogStore.ts";
 import * as DesktopClerk from "./app/DesktopClerk.ts";
+import * as DesktopDevProtocolClient from "./app/DesktopDevProtocolClient.ts";
 import * as DesktopCliCommand from "./app/DesktopCliCommand.ts";
 import * as DesktopApplicationMenu from "./window/DesktopApplicationMenu.ts";
 import * as DesktopAssets from "./app/DesktopAssets.ts";
@@ -84,6 +85,10 @@ if (process.argv.includes("--version")) {
     if (!(error instanceof Error) || !("code" in error) || error.code !== "EPIPE") throw error;
   }
   Electron.app.exit(0);
+}
+
+if (!Electron.app.isPackaged) {
+  DesktopDevProtocolClient.restoreDevServerUrl(process.argv, process.env);
 }
 
 const layerDesktopEnvironment = Layer.unwrap(

@@ -1,7 +1,7 @@
 import { scopeProjectRef, scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
-import type { EnvironmentId, ScopedThreadRef } from "@t3tools/contracts";
-import { promptLinkAppPath } from "@t3tools/shared/promptLinks";
+import type { EnvironmentId, ScopedThreadRef, ThreadId } from "@t3tools/contracts";
+import { appThreadLinkThreadId, promptLinkAppPath } from "@t3tools/shared/promptLinks";
 import { useRouter } from "@tanstack/react-router";
 import { useEffect, useEffectEvent, useRef } from "react";
 
@@ -11,7 +11,7 @@ import { useComposerDraftStore } from "../../composerDraftStore";
 import { useNewThreadHandler } from "../../hooks/useHandleNewThread";
 import { useScratchProject } from "../../hooks/useScratchProject";
 import { selectActiveRightPanelSurface, useRightPanelStore } from "../../rightPanelStore";
-import { resolveThreadRouteTarget } from "../../threadRoutes";
+import { buildThreadRouteParams, resolveThreadRouteTarget } from "../../threadRoutes";
 import { assetEnvironment } from "../../state/assets";
 import { useEnvironmentHttpBaseUrl, usePrimaryEnvironment } from "../../state/environments";
 import { previewEnvironment } from "../../state/preview";
@@ -89,6 +89,22 @@ export function DesktopWebLinkCoordinator() {
     const appPath = promptLinkAppPath(url);
     if (appPath !== null) {
       await router.navigate({ href: appPath });
+      return;
+    }
+    const threadId = appThreadLinkThreadId(url);
+    if (threadId !== null) {
+      // A short thread link comes from a program on this machine, so it names a
+      // thread of this machine's environment.
+      if (primaryEnvironment === null) {
+        reportFailure(url);
+        return;
+      }
+      await router.navigate({
+        to: "/$environmentId/$threadId",
+        params: buildThreadRouteParams(
+          scopeThreadRef(primaryEnvironment.environmentId, threadId as ThreadId),
+        ),
+      });
       return;
     }
     const isFile = url.startsWith("file:");

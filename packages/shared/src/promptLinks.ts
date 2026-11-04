@@ -206,6 +206,26 @@ export function promptLinkAppPath(
   return thread ? `/${thread[1]}/${thread[2]}${url.search}` : null;
 }
 
+const SHORT_THREAD_PATH = /^\/([^/]+)\/?$/;
+
+/**
+ * `t3code://thread/<threadId>` lets another program on this machine open a thread
+ * without knowing the environment id. It names a thread of the local environment.
+ */
+export function appThreadLinkThreadId(value: string): string | null {
+  if (!URL.canParse(value)) return null;
+  const url = new URL(value);
+  if (!APP_SCHEME.test(url.protocol) || url.host !== "thread") return null;
+  const segment = SHORT_THREAD_PATH.exec(url.pathname)?.[1];
+  if (segment === undefined) return null;
+  try {
+    const threadId = decodeURIComponent(segment).trim();
+    return threadId.length > 0 && !threadId.includes("/") ? threadId : null;
+  } catch {
+    return null;
+  }
+}
+
 export function promptLinkDeepLink(appPath: string, scheme = "t3code"): string {
   const url = new URL(appPath, "https://app.invalid");
   const host = url.pathname === "/new" ? "new" : `threads${url.pathname}`;

@@ -1,5 +1,6 @@
 // @effect-diagnostics nodeBuiltinImport:off globalFetchInEffect:off - Hosted handoff test uses a real localhost listener without an OpenAI account.
 import * as NodeHttp from "node:http";
+import * as NodePathPosix from "node:path/posix";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { codexAuthHandoffUrl, readCodexAuthDelivery } from "@t3tools/shared/codexAuthHandoff";
 import { EnvironmentId, ProviderInstanceId } from "@t3tools/contracts";
@@ -63,6 +64,10 @@ const layerDesktopClerk = (
   const environment = DesktopEnvironment.DesktopEnvironment.of({
     stateDir: "/tmp/t3-state",
     isDevelopment,
+    isPackaged: !isDevelopment,
+    devServerUrl: isDevelopment ? Option.some(new URL("http://127.0.0.1:5733")) : Option.none(),
+    dirname: "/repo/apps/desktop/dist-electron",
+    path: { join: NodePathPosix.join },
     appDataDirectory: "/tmp/app-data",
     platform,
   } as unknown as DesktopEnvironment.DesktopEnvironment["Service"]);
@@ -79,6 +84,11 @@ const layerDesktopClerk = (
     quit: Effect.sync(() => {
       events.push("quit");
     }),
+    setAsDefaultProtocolClient: (protocol: string, path?: string, args?: readonly string[]) =>
+      Effect.sync(() => {
+        events.push(`setAsDefaultProtocolClient:${[protocol, path, ...(args ?? [])].join(" ")}`);
+        return true;
+      }),
     on: (name: string, listener: (...args: unknown[]) => void) =>
       Effect.acquireRelease(
         Effect.sync(() => {
@@ -99,6 +109,7 @@ const layerDesktopClerk = (
         Layer.succeed(DesktopEnvironment.DesktopEnvironment, environment),
         Layer.succeed(ElectronApp.ElectronApp, electronApp),
         Layer.succeed(ElectronShell.ElectronShell, shell),
+        Layer.succeed(HostProcess.ExecutablePath, "/repo/electron.exe"),
         fileSystemLayer,
       ),
     ),
@@ -170,10 +181,14 @@ describe("DesktopClerk", () => {
       isDevelopment: true,
       platform: "win32" as const,
       userData: "/tmp/app-data/t3code-dev",
+      // Registered after the bridge, which registers the bare executable.
+      after: [
+        "setAsDefaultProtocolClient:t3code-dev /repo/electron.exe --t3code-dev-root=/repo/apps/desktop /repo/apps/desktop/dist-electron/main.cjs --t3code-dev-server-url=http://127.0.0.1:5733/",
+      ],
     },
   ])(
     "creates the bridge before startup can yield to the event loop ($name)",
-    ({ isDevelopment, platform, userData }) => {
+    ({ isDevelopment, platform, userData, after = [] }) => {
       const events: string[] = [];
       storageMock.mockReturnValue(storageAdapter);
       createClerkBridgeMock.mockImplementation(() => {
@@ -194,6 +209,7 @@ describe("DesktopClerk", () => {
         "requestSingleInstanceLock",
         "on:second-instance",
         "createClerkBridge",
+        ...after,
       ]);
     },
   );
@@ -361,6 +377,35 @@ describe("DesktopClerk", () => {
         assert.equal(createClerkBridgeMock.mock.calls.length, 0);
         assert.equal(storageMock.mock.calls.length, 0);
       }),
+  );
+
+  it.effect("quits a dev protocol client that finds no running dev app", () =>
+    Effect.gen(function* () {
+      const events: string[] = [];
+      const exit = yield* Effect.exit(
+        Effect.scoped(
+          Layer.build(
+            layerDesktopClerk(true, events, "win32").pipe(
+              Layer.provide(
+                Layer.succeed(HostProcess.Arguments, [
+                  "electron.exe",
+                  "--t3code-dev-server-url=http://127.0.0.1:5733/",
+                  "t3code-dev://thread/thread-1",
+                ]),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      assert.isTrue(Exit.hasInterrupts(exit));
+      assert.deepEqual(events, [
+        "setPath:userData:/tmp/app-data/t3code-dev",
+        "requestSingleInstanceLock",
+        "quit",
+      ]);
+      assert.equal(createClerkBridgeMock.mock.calls.length, 0);
+    }),
   );
 });
 
