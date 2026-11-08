@@ -23,6 +23,8 @@ import {
   buildCommitMessagePrompt,
   buildPrContentPrompt,
   buildThreadTitlePrompt,
+  buildCodeExercisePrompt,
+  buildCodeExerciseReviewPrompt,
 } from "@t3tools/provider-core/server/textGenerationPrompts";
 import {
   sanitizeCommitSubject,
@@ -342,11 +344,25 @@ export const makeMuseTextGeneration = Effect.fn("makeMuseTextGeneration")(functi
   });
   const generateReviewGuide: ProviderTextGeneration["generateReviewGuide"] = () =>
     Effect.fail(investigationUnsupported("generateReviewGuide", "Muse Code"));
+  const generateCodeExercise: ProviderTextGeneration["generateCodeExercise"] = (input) =>
+    runMuseJson({
+      operation: "generateCodeExercise",
+      ...buildCodeExercisePrompt(input),
+      modelSelection: input.modelSelection,
+    });
+  const reviewCodeExercise: ProviderTextGeneration["reviewCodeExercise"] = (input) =>
+    runMuseJson({
+      operation: "reviewCodeExercise",
+      ...buildCodeExerciseReviewPrompt(input),
+      modelSelection: input.modelSelection,
+    });
   return {
     generateCommitMessage,
     generatePrContent,
     generateBranchName,
     generateThreadTitle,
     generateReviewGuide,
+    generateCodeExercise,
+    reviewCodeExercise,
   } satisfies ProviderTextGeneration;
 });

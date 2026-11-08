@@ -239,6 +239,7 @@ import * as PullRequestSyncReactor from "./orchestration-v2/PullRequestSyncReact
 import * as SourceControlDiscovery from "./sourceControl/SourceControlDiscovery.ts";
 import * as OtlpEndpointCheck from "./observability/OtlpEndpointCheck.ts";
 import * as RoerService from "./roer/RoerService.ts";
+import * as CodeLearningService from "./codeLearning/CodeLearningService.ts";
 import * as SourceControlRepositoryService from "./sourceControl/SourceControlRepositoryService.ts";
 import * as SourceControlBuiltInDrivers from "./sourceControl/builtInDrivers.ts";
 import * as SourceControlProviderRegistry from "./sourceControl/SourceControlProviderRegistry.ts";
@@ -1288,6 +1289,7 @@ const layerWsRpc = (
       const sourceControlDiscovery = yield* SourceControlDiscovery.SourceControlDiscovery;
       const otlpEndpointCheck = yield* OtlpEndpointCheck.OtlpEndpointCheck;
       const roer = yield* RoerService.RoerService;
+      const codeLearning = yield* CodeLearningService.CodeLearningService;
       const automaticGitFetchInterval = serverSettings.getSettings.pipe(
         Effect.map(
           (settings) => resolveServerBackgroundActivitySettings(settings).automaticGitFetchInterval,
@@ -2389,6 +2391,7 @@ const layerWsRpc = (
         [WS_METHODS.roerThreadPlacement]: (input) => roer.placement(input),
         [WS_METHODS.roerMoveThread]: (input) => roer.moveThread(input),
         [WS_METHODS.roerSteerThread]: (input) => roer.steerThread(input),
+        [WS_METHODS.codeLearningRun]: (input) => codeLearning.run(input),
         [WS_METHODS.serverSignalProcess]: (input) => processDiagnostics.signal(input),
         [WS_METHODS.serverReportClientActivity]: (input, metadata) =>
           Ref.update(rpcClientIds, (clientIds) => {
@@ -3185,6 +3188,7 @@ export const layer = Layer.unwrap(
               Layer.provide(Layer.succeed(PullRequestService.PullRequestService, pullRequests)),
               Layer.provide(OtlpEndpointCheck.layer),
               Layer.provide(RoerService.layer),
+              Layer.provide(CodeLearningService.layer),
               Layer.provide(
                 Layer.succeed(
                   PullRequestReviewGuideService.PullRequestReviewGuideService,

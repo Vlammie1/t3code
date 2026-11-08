@@ -36,6 +36,8 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
   [WS_METHODS.roerMoveThread]: AuthOrchestrationOperateScope,
   // Sending and stopping from here steer the cloud worker, like a turn here would.
   [WS_METHODS.roerSteerThread]: AuthOrchestrationOperateScope,
+  // Making or reviewing an exercise runs a model on this environment's providers.
+  [WS_METHODS.codeLearningRun]: AuthOrchestrationOperateScope,
   [WS_METHODS.gitRunStackedAction]: AuthSourceControlWriteScope,
   [WS_METHODS.gitPreparePullRequestThread]: AuthSourceControlWriteScope,
   [WS_METHODS.vcsCreateWorktree]: AuthSourceControlWriteScope,

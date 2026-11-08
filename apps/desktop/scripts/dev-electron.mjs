@@ -136,6 +136,7 @@ function startApp() {
 
     const exitedAbnormally = signal !== null || code !== 0;
     if (!shuttingDown && !expectedExits.has(app) && exitedAbnormally) {
+      console.warn(`[dev-electron] Electron exited (code ${code}, signal ${signal}), restarting`);
       scheduleRestart();
     }
   });
@@ -202,19 +203,38 @@ function scheduleRestart() {
   }, restartDebounceMs);
 }
 
+function readFileSignature(path) {
+  try {
+    const stats = NodeFS.statSync(path);
+    return `${stats.mtimeMs}:${stats.size}`;
+  } catch {
+    return null;
+  }
+}
+
 function startWatchers() {
   for (const { directory, files } of watchedDirectories) {
-    const watcher = NodeFS.watch(
-      NodePath.join(desktopDir, directory),
-      { persistent: true },
-      (_eventType, filename) => {
-        if (typeof filename !== "string" || !files.has(filename)) {
-          return;
-        }
-
-        scheduleRestart();
-      },
+    const directoryPath = NodePath.join(desktopDir, directory);
+    // Windows reports a read as a change once the file's last-access time is an
+    // hour old (a virus scan after waking from sleep, or `ls` in Git Bash), and
+    // each restart takes the backend and every agent session down with it.
+    // Only a new mtime or size counts as a rebuild.
+    const signatures = new Map(
+      [...files].map((file) => [file, readFileSignature(NodePath.join(directoryPath, file))]),
     );
+    const watcher = NodeFS.watch(directoryPath, { persistent: true }, (_eventType, filename) => {
+      if (typeof filename !== "string" || !files.has(filename)) {
+        return;
+      }
+
+      const signature = readFileSignature(NodePath.join(directoryPath, filename));
+      if (signature === signatures.get(filename)) {
+        return;
+      }
+      signatures.set(filename, signature);
+      console.info(`[dev-electron] ${directory}/${filename} changed, restarting Electron`);
+      scheduleRestart();
+    });
 
     watchers.push(watcher);
   }

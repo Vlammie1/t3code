@@ -347,6 +347,8 @@ function createTextGeneration(
         title: "Update workflow",
       }),
     generateReviewGuide: () => Effect.succeed({ stops: [] }),
+    generateCodeExercise: () => Effect.die("generateCodeExercise is not used by git tests"),
+    reviewCodeExercise: () => Effect.die("reviewCodeExercise is not used by git tests"),
     ...overrides,
   };
 
@@ -396,6 +398,8 @@ function createTextGeneration(
         ),
       ),
     generateReviewGuide: (input) => implementation.generateReviewGuide(input),
+    generateCodeExercise: (input) => implementation.generateCodeExercise(input),
+    reviewCodeExercise: (input) => implementation.reviewCodeExercise(input),
   };
 }
 

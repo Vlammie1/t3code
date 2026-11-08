@@ -10,6 +10,7 @@
 - [Source control](./user/source-control.md)
 - [Projects](./user/projects.md)
 - [Move a thread to the cloud](./user/roer-cloud.md)
+- [Code leren](./user/code-learning.md)
 - [Project settings](./user/project-settings.md)
 - [Appearance and themes](./user/appearance.md)
 - [Keyboard shortcuts](./user/keybindings.md)

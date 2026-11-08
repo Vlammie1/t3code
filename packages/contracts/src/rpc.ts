@@ -124,6 +124,7 @@ import {
   RoerThreadInput,
   RoerThreadPlacement,
 } from "./roer.ts";
+import { CodeLearningError, CodeLearningInput, CodeLearningResult } from "./codeLearning.ts";
 import {
   GitActionProgressEvent,
   VcsSwitchRefInput,
@@ -579,6 +580,7 @@ export const WS_METHODS = {
   roerThreadPlacement: "roer.threadPlacement",
   roerMoveThread: "roer.moveThread",
   roerSteerThread: "roer.steerThread",
+  codeLearningRun: "codeLearning.run",
   subscribeRoerThreadActivity: "subscribeRoerThreadActivity",
   subscribeTerminalEvents: "subscribeTerminalEvents",
   subscribeTerminalMetadata: "subscribeTerminalMetadata",
@@ -1400,6 +1402,13 @@ const WsRoerSteerThreadRpc = Rpc.make(WS_METHODS.roerSteerThread, {
   error: Schema.Union([RoerError, EnvironmentAuthorizationError]),
 });
 
+// Making and reviewing an exercise share one RPC for the same reason as steering Roer.
+const WsCodeLearningRunRpc = Rpc.make(WS_METHODS.codeLearningRun, {
+  payload: CodeLearningInput,
+  success: CodeLearningResult,
+  error: Schema.Union([CodeLearningError, EnvironmentAuthorizationError]),
+});
+
 const WsSubscribeRoerThreadActivityRpc = Rpc.make(WS_METHODS.subscribeRoerThreadActivity, {
   payload: RoerThreadInput,
   success: RoerThreadActivity,
@@ -2051,6 +2060,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsRoerThreadPlacementRpc,
   WsRoerMoveThreadRpc,
   WsRoerSteerThreadRpc,
+  WsCodeLearningRunRpc,
   WsSubscribeRoerThreadActivityRpc,
   WsVcsPullRpc,
   WsVcsRefreshStatusRpc,

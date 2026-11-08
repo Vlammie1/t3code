@@ -280,6 +280,7 @@ import {
   WifiOffIcon,
 } from "~/components/appIcons";
 import { moveToastTitle, useRoerThread, useRoerThreadActivity } from "../state/roer";
+import { CodeLearningComposerBox, useCodeLearningAfterTurn } from "./codeLearning/CodeLearning";
 import { mergeRoerTurnItems, roerTurnItems } from "../state/roerTimeline";
 import { cn, randomUUID } from "~/lib/utils";
 import { COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS } from "~/workspaceTitlebar";
@@ -1801,6 +1802,11 @@ export default function ChatView(props: ChatViewProps) {
     setMountedTerminalThreadKeys(reconciledMountedTerminalThreadKeys);
   }
   const latestRunSettled = isLatestRunSettled(activeLatestRun, activeRuntime);
+  useCodeLearningAfterTurn(
+    isServerThread ? activeThreadRef : null,
+    activeLatestRun,
+    latestRunSettled,
+  );
   const activePlan = deriveActivePlanState(serverProjection, activeActivityRun?.runId);
   // Tasks progress for the running turn's own plan only — deriveActivePlanState
   // falls back to older runs' plans, which must not label fresh work.
@@ -3725,6 +3731,10 @@ export default function ChatView(props: ChatViewProps) {
   const addImagesSurfaceStable = useStableCallback(() => {
     if (!activeThreadRef) return;
     useRightPanelStore.getState().open(activeThreadRef, "images");
+  });
+  const addLearnSurfaceStable = useStableCallback(() => {
+    if (!activeThreadRef) return;
+    useRightPanelStore.getState().open(activeThreadRef, "learn");
   });
   const { state: deviceState, loaded: deviceStateLoaded } = useDeviceState(
     activeThreadRef?.environmentId ?? null,
@@ -7919,6 +7929,7 @@ export default function ChatView(props: ChatViewProps) {
       onAddPullRequest: addPullRequestSurfaceStable,
       onAddPullRequests: addPullRequestsSurfaceStable,
       onAddImages: addImagesSurfaceStable,
+      onAddLearn: addLearnSurfaceStable,
       onAddDevice: addDeviceSurfaceStable,
       browserAvailable: canOperatePreview && browserAvailable,
       terminalAvailable: activeProject !== null && canOperateTerminal,
@@ -8379,6 +8390,11 @@ export default function ChatView(props: ChatViewProps) {
                               }
                               isPreparingWorktree={isPreparingWorktree && !sendQueuesBehindSetup}
                               queuedRunsControl={queuedRunsControl}
+                              learningBox={
+                                isServerThread && activeThreadRef ? (
+                                  <CodeLearningComposerBox threadRef={activeThreadRef} />
+                                ) : null
+                              }
                               limitStrip={
                                 usageLimitsLiveReport !== null && !usageLimitsPanelOpen ? (
                                   <ComposerLimitStrip
@@ -8720,6 +8736,7 @@ export default function ChatView(props: ChatViewProps) {
             onAddPullRequest={addPullRequestSurfaceStable}
             onAddPullRequests={addPullRequestsSurfaceStable}
             onAddImages={addImagesSurfaceStable}
+            onAddLearn={addLearnSurfaceStable}
             onAddDevice={addDeviceSurfaceStable}
             browserAvailable={canOperatePreview && browserAvailable}
             terminalAvailable={activeProject !== null && canOperateTerminal}
@@ -8780,6 +8797,7 @@ export default function ChatView(props: ChatViewProps) {
               onAddPullRequest={addPullRequestSurfaceStable}
               onAddPullRequests={addPullRequestsSurfaceStable}
               onAddImages={addImagesSurfaceStable}
+              onAddLearn={addLearnSurfaceStable}
               onAddDevice={addDeviceSurfaceStable}
               browserAvailable={canOperatePreview && browserAvailable}
               terminalAvailable={activeProject !== null && canOperateTerminal}

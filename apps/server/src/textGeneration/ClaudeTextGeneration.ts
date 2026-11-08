@@ -184,8 +184,11 @@ export const makeClaudeTextGeneration = Effect.fn("makeClaudeTextGeneration")(fu
     );
 
     const runClaudeCommand = Effect.fn("runClaudeJson.runClaudeCommand")(function* () {
+      // These prompts carry everything the model needs; the checkout would only add its CLAUDE.md to the bill.
       const workingDirectory =
-        operation === "generateThreadTitle"
+        operation === "generateThreadTitle" ||
+        operation === "generateCodeExercise" ||
+        operation === "reviewCodeExercise"
           ? yield* fileSystem
               .makeTempDirectoryScoped({ prefix: "t3code-claude-title-" })
               .pipe(

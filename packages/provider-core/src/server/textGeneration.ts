@@ -93,6 +93,45 @@ export type ReviewGuideGenerationResult = Omit<
   "headSha" | "generatedAt" | "modelSelection"
 >;
 
+export interface CodeExerciseGenerationInput {
+  cwd: string;
+  diffPatch: string;
+  level: "fill" | "line" | "block";
+  avoid: ReadonlyArray<string>;
+  modelSelection: ModelSelection;
+}
+
+export interface CodeExerciseGenerationResult {
+  summary: string;
+  filePath: string;
+  language: string;
+  before: string;
+  solution: string;
+  after: string;
+  task: string;
+  hint: string;
+  explanation: string;
+}
+
+export interface CodeExerciseReviewInput {
+  cwd: string;
+  summary: string;
+  filePath: string;
+  language: string;
+  before: string;
+  solution: string;
+  after: string;
+  task: string;
+  answer: string;
+  modelSelection: ModelSelection;
+}
+
+export interface CodeExerciseReviewResult {
+  verdict: "correct" | "almost" | "wrong";
+  feedback: string;
+  tip: string | null;
+}
+
 export interface ProviderTextGeneration {
   readonly generateCommitMessage: (
     input: CommitMessageGenerationInput,
@@ -113,4 +152,12 @@ export interface ProviderTextGeneration {
   readonly generateReviewGuide: (
     input: ReviewGuideGenerationInput,
   ) => Effect.Effect<ReviewGuideGenerationResult, TextGenerationError>;
+
+  readonly generateCodeExercise: (
+    input: CodeExerciseGenerationInput,
+  ) => Effect.Effect<CodeExerciseGenerationResult, TextGenerationError>;
+
+  readonly reviewCodeExercise: (
+    input: CodeExerciseReviewInput,
+  ) => Effect.Effect<CodeExerciseReviewResult, TextGenerationError>;
 }

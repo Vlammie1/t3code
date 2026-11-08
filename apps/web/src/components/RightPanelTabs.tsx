@@ -33,6 +33,7 @@ import {
   Files,
   Globe2,
   Images,
+  BookOpenIcon,
   Plus,
   Smartphone,
   TerminalSquare,
@@ -139,6 +140,7 @@ interface RightPanelTabsProps {
   onAddPullRequest: () => void;
   onAddPullRequests: () => void;
   onAddImages: () => void;
+  onAddLearn: () => void;
   onAddDevice: () => void;
   browserAvailable: boolean;
   terminalAvailable: boolean;
@@ -176,6 +178,7 @@ const SURFACE_DISABLED_REASONS = {
   pullRequests: "No linked pull requests are available for this thread.",
   device: "Devices are only available from a thread.",
   images: "Images are only available from a thread.",
+  learn: "Code leren is only available from a thread.",
 } as const;
 
 const LAUNCHER_SHORTCUT_BLOCKING_LAYERS = [
@@ -198,6 +201,7 @@ const SURFACE_UNAVAILABLE_HINTS = {
   pullRequests: "No linked pull requests available.",
   device: "Available from a thread.",
   images: "Available from a thread.",
+  learn: "Available from a thread.",
 } as const;
 
 type TabContextMenuAction =
@@ -319,6 +323,7 @@ function RightPanelEmptyState(props: {
   onAddPullRequest: () => void;
   onAddPullRequests: () => void;
   onAddImages: () => void;
+  onAddLearn: () => void;
   onAddDevice: () => void;
   browserAvailable: boolean;
   terminalAvailable: boolean;
@@ -386,6 +391,14 @@ function RightPanelEmptyState(props: {
       available: true,
       disabledReason: SURFACE_UNAVAILABLE_HINTS.images,
       onClick: props.onAddImages,
+    },
+    {
+      label: "Code leren",
+      icon: BookOpenIcon,
+      shortcut: "C",
+      available: true,
+      disabledReason: SURFACE_UNAVAILABLE_HINTS.learn,
+      onClick: props.onAddLearn,
     },
     {
       label: "Device",
@@ -580,6 +593,8 @@ function surfaceTitle(
       return "Pull requests";
     case "images":
       return "Images";
+    case "learn":
+      return "Code leren";
     case "device":
       return surface.title ?? surface.target?.name ?? "Device";
     case "preview": {
@@ -672,6 +687,8 @@ function SurfaceIcon({
       return <PullRequestGlyph.link className="size-3 shrink-0" />;
     case "images":
       return <Images className="size-3 shrink-0" />;
+    case "learn":
+      return <BookOpenIcon className="size-3 shrink-0" />;
     case "device":
       return surface.target?.platform === "ios" ? (
         <AppleIcon className="size-3 shrink-0" />
@@ -989,6 +1006,7 @@ export type RightPanelSurfaceActionInput = Pick<
   | "onAddPullRequest"
   | "onAddPullRequests"
   | "onAddImages"
+  | "onAddLearn"
   | "onAddDevice"
 >;
 
@@ -1050,6 +1068,14 @@ export function rightPanelSurfaceActions(props: RightPanelSurfaceActionInput) {
       available: true,
       disabledReason: SURFACE_DISABLED_REASONS.images,
       onClick: props.onAddImages,
+    },
+    {
+      label: "Code leren",
+      icon: BookOpenIcon,
+      shortcut: "C",
+      available: true,
+      disabledReason: SURFACE_DISABLED_REASONS.learn,
+      onClick: props.onAddLearn,
     },
     {
       label: "Device",
@@ -1506,6 +1532,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
             onAddPullRequest={props.onAddPullRequest}
             onAddPullRequests={props.onAddPullRequests}
             onAddImages={props.onAddImages}
+            onAddLearn={props.onAddLearn}
             onAddDevice={props.onAddDevice}
             browserAvailable={props.browserAvailable}
             terminalAvailable={props.terminalAvailable}

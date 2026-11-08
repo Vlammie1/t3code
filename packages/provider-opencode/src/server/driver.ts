@@ -159,6 +159,16 @@ function selectOpenCodeRuntimeTextGeneration(
         v1: v1.generateReviewGuide(input),
         v2: v2.generateReviewGuide(input),
       }),
+    generateCodeExercise: (input) =>
+      byOpenCodeRuntime(probe.get, {
+        v1: v1.generateCodeExercise(input),
+        v2: v2.generateCodeExercise(input),
+      }),
+    reviewCodeExercise: (input) =>
+      byOpenCodeRuntime(probe.get, {
+        v1: v1.reviewCodeExercise(input),
+        v2: v2.reviewCodeExercise(input),
+      }),
   };
 }
 

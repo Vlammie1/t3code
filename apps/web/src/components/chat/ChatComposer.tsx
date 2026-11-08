@@ -1612,6 +1612,8 @@ export interface ChatComposerProps {
   onPageScrollRelease: () => void;
 
   queuedRunsControl?: ReactNode;
+  /** Code leren's exercise, over the notices because it is something to do, not something to know. */
+  learningBox?: ReactNode;
   /** Usage limit bars attached directly above the prompt. */
   limitStrip?: ReactNode;
   editingQueuedAttachments: ReadonlyArray<{
@@ -6428,6 +6430,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         : null}
       <ComposerBanner.Dock>
         <ComposerBanner.Column>
+          {props.learningBox}
           <ComposerBannerStack
             key={activeThreadId}
             className="relative z-0"

@@ -1353,6 +1353,10 @@ export function createServerEnvironmentAtoms<R, E>(
       label: "environment-data:server:roer-steer-thread",
       tag: WS_METHODS.roerSteerThread,
     }),
+    codeLearningRun: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:code-learning-run",
+      tag: WS_METHODS.codeLearningRun,
+    }),
     roerThreadActivity: createEnvironmentRpcSubscriptionAtomFamily(runtime, {
       label: "environment-data:server:roer-thread-activity",
       tag: WS_METHODS.subscribeRoerThreadActivity,

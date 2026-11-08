@@ -24,6 +24,7 @@ import { PullRequestDetailGhost } from "../pullRequest/PullRequestGhosts";
 import { PullRequestsUnavailableState } from "../pullRequest/PullRequestsUnavailableState";
 import { ThreadPullRequestsPanel } from "../pullRequest/ThreadPullRequestsPanel";
 import { SessionImagesPanel } from "../images/SessionImagesPanel";
+import { CodeLearningPanel } from "../codeLearning/CodeLearning";
 import type { SessionImage } from "../images/sessionImages";
 
 const PreviewPanel = lazy(() =>
@@ -189,6 +190,8 @@ function ShownSurfaceContent(props: RightPanelSurfaceContentProps) {
       return <ThreadPullRequestsPanel threadRef={threadRef} />;
     case "images":
       return <SessionImagesPanel environmentId={props.environmentId} images={props.images} />;
+    case "learn":
+      return <CodeLearningPanel threadRef={threadRef} />;
     case "device":
       return (
         <Suspense fallback={null}>

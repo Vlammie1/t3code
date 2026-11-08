@@ -8,6 +8,8 @@ import { extractJsonObject } from "@t3tools/shared/schemaJson";
 import type { ProviderTextGeneration } from "./textGeneration.ts";
 import {
   buildBranchNamePrompt,
+  buildCodeExercisePrompt,
+  buildCodeExerciseReviewPrompt,
   buildCommitMessagePrompt,
   buildPrContentPrompt,
   buildReviewGuidePrompt,
@@ -168,11 +170,35 @@ export function fromRunner(name: string, run: Runner): ProviderTextGeneration {
     });
   });
 
+  const generateCodeExercise: ProviderTextGeneration["generateCodeExercise"] = Effect.fn(
+    `${name}.generateCodeExercise`,
+  )(function* (input) {
+    return yield* run({
+      operation: "generateCodeExercise",
+      cwd: input.cwd,
+      modelSelection: input.modelSelection,
+      ...buildCodeExercisePrompt(input),
+    });
+  });
+
+  const reviewCodeExercise: ProviderTextGeneration["reviewCodeExercise"] = Effect.fn(
+    `${name}.reviewCodeExercise`,
+  )(function* (input) {
+    return yield* run({
+      operation: "reviewCodeExercise",
+      cwd: input.cwd,
+      modelSelection: input.modelSelection,
+      ...buildCodeExerciseReviewPrompt(input),
+    });
+  });
+
   return {
     generateCommitMessage,
     generatePrContent,
     generateBranchName,
     generateThreadTitle,
     generateReviewGuide,
+    generateCodeExercise,
+    reviewCodeExercise,
   } satisfies ProviderTextGeneration;
 }

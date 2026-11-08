@@ -13,6 +13,10 @@ import * as ThreadTitleLinks from "./ThreadTitleLinks.ts";
 export type {
   BranchNameGenerationInput,
   BranchNameGenerationResult,
+  CodeExerciseGenerationInput,
+  CodeExerciseGenerationResult,
+  CodeExerciseReviewInput,
+  CodeExerciseReviewResult,
   CommitMessageGenerationInput,
   CommitMessageGenerationResult,
   PrContentGenerationInput,
@@ -32,7 +36,9 @@ type TextGenerationOp =
   | "generatePrContent"
   | "generateBranchName"
   | "generateThreadTitle"
-  | "generateReviewGuide";
+  | "generateReviewGuide"
+  | "generateCodeExercise"
+  | "reviewCodeExercise";
 
 const resolveInstance = (
   registry: ProviderInstanceRegistry.ProviderInstanceRegistry["Service"],
@@ -72,6 +78,14 @@ export const make = Effect.gen(function* () {
     generateReviewGuide: (input) =>
       resolveInstance(registry, "generateReviewGuide", input.modelSelection.instanceId).pipe(
         Effect.flatMap((textGeneration) => textGeneration.generateReviewGuide(input)),
+      ),
+    generateCodeExercise: (input) =>
+      resolveInstance(registry, "generateCodeExercise", input.modelSelection.instanceId).pipe(
+        Effect.flatMap((textGeneration) => textGeneration.generateCodeExercise(input)),
+      ),
+    reviewCodeExercise: (input) =>
+      resolveInstance(registry, "reviewCodeExercise", input.modelSelection.instanceId).pipe(
+        Effect.flatMap((textGeneration) => textGeneration.reviewCodeExercise(input)),
       ),
     generateThreadTitle: (input) =>
       resolveInstance(registry, "generateThreadTitle", input.modelSelection.instanceId).pipe(

@@ -165,6 +165,7 @@ const RPC_AGGREGATES = {
   [WS_METHODS.roerThreadPlacement]: "roer",
   [WS_METHODS.roerMoveThread]: "roer",
   [WS_METHODS.roerSteerThread]: "roer",
+  [WS_METHODS.codeLearningRun]: "provider",
   [WS_METHODS.subscribeRoerThreadActivity]: "roer",
   [WS_METHODS.subscribeResourceTelemetry]: "server",
   [WS_METHODS.vcsRefreshStatus]: "vcs",
