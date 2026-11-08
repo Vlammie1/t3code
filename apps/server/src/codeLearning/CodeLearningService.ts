@@ -22,6 +22,7 @@ import * as TextGeneration from "../textGeneration/TextGeneration.ts";
 import {
   addedCodeOf,
   diffContainsCode,
+  focusDiff,
   keepCodeFiles,
   undoOverEscapedCode,
 } from "./exerciseDiff.ts";
@@ -43,6 +44,8 @@ export class CodeLearningService extends Context.Service<
 
 /** Earlier turns are tried when the newest one only touched files that make poor exercises. */
 const MAX_TURNS_BACK = 5;
+/** Enough for one file with context; more only makes the exercise slower to make. */
+const MAX_DIFF_CHARS = 12_000;
 
 const REVIEW_MODEL = "claude-sonnet-5-5";
 const CLAUDE_DRIVER = "claudeAgent";
@@ -119,23 +122,15 @@ const make = Effect.gen(function* () {
         })
         .pipe(Effect.option);
       if (turnDiff._tag === "None") continue;
-      const code = keepCodeFiles(turnDiff.value.diff);
+      const code = focusDiff(keepCodeFiles(turnDiff.value.diff), MAX_DIFF_CHARS);
       if (addedCodeOf(code).trim().length > 0) return { turnCount, diff: code, cwd };
     }
-    if (scope === "latest") {
-      return yield* new CodeLearningError({ detail: "De laatste beurt veranderde geen code." });
-    }
-    const latest = turns[0] ?? 0;
-    const full = yield* diffs
-      .getFullThreadDiff({ threadId, toTurnCount: latest, ignoreWhitespace: false })
-      .pipe(Effect.mapError(failWith("De wijzigingen van deze chat zijn niet te lezen.")));
-    const code = keepCodeFiles(full.diff);
-    if (addedCodeOf(code).trim().length === 0) {
-      return yield* new CodeLearningError({
-        detail: "In deze chat is nog geen code geschreven om mee te oefenen.",
-      });
-    }
-    return { turnCount: 0, diff: code, cwd };
+    return yield* new CodeLearningError({
+      detail:
+        scope === "latest"
+          ? "De laatste beurt veranderde geen code."
+          : "In de laatste beurten van deze chat is geen code geschreven om mee te oefenen.",
+    });
   });
 
   const modelSelection = settings.getSettings.pipe(
@@ -185,6 +180,9 @@ const make = Effect.gen(function* () {
         before: generated.before,
         solution: generated.solution,
         after: generated.after,
+        walkthrough: generated.walkthrough
+          .map((step) => ({ code: step.code.trim(), explanation: step.explanation.trim() }))
+          .filter((step) => step.explanation.length > 0),
         task: generated.task.trim(),
         hint: generated.hint.trim(),
         explanation: generated.explanation.trim(),

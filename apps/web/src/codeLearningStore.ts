@@ -29,6 +29,8 @@ export interface CodeExerciseEntry {
   readonly attempts: number;
   readonly revealed: boolean;
   readonly hintShown: boolean;
+  /** False while the walkthrough is read; the field opens once the learner says they follow it. */
+  readonly practising?: boolean;
 }
 
 interface ThreadLearning {
@@ -41,14 +43,28 @@ interface ThreadLearning {
 
 type Busy = "generating" | "reviewing";
 
+/** Easiest first. Three exercises right at the first try, without a hint, move the learner one level up. */
+export const CODE_LEARNING_LEVELS: ReadonlyArray<CodeLearningLevel> = [
+  "word",
+  "fill",
+  "line",
+  "block",
+];
+export const MASTERY_STREAK = 3;
+
 interface CodeLearningState {
   readonly enabled: boolean;
   readonly level: CodeLearningLevel;
+  /** Exercises in a row on this level that were right at the first try without a hint. */
+  readonly streak: number;
+  /** The level just reached by mastering the one before, until the learner has seen it. */
+  readonly leveledUpTo: CodeLearningLevel | null;
   readonly byThread: Readonly<Record<string, ThreadLearning>>;
   readonly busy: Readonly<Record<string, Busy>>;
   readonly errors: Readonly<Record<string, string>>;
   setEnabled: (enabled: boolean) => void;
   setLevel: (level: CodeLearningLevel) => void;
+  dismissLevelUp: () => void;
 }
 
 const MAX_ENTRIES_PER_THREAD = 30;
@@ -58,21 +74,29 @@ export const useCodeLearningStore = create<CodeLearningState>()(
   persist(
     (set) => ({
       enabled: true,
-      level: "fill",
+      level: "word",
+      streak: 0,
+      leveledUpTo: null,
       byThread: {},
       busy: {},
       errors: {},
       setEnabled: (enabled) => set({ enabled }),
-      setLevel: (level) => set({ level }),
+      setLevel: (level) => set({ level, streak: 0, leveledUpTo: null }),
+      dismissLevelUp: () => set({ leveledUpTo: null }),
     }),
     {
       name: "t3code:code-learning:v1",
       storage: createJSONStorage(() =>
         resolveStorage(typeof window === "undefined" ? undefined : window.localStorage),
       ),
+      version: 1,
+      // Version 0 started at filling in part of a line, which was too hard as a first step.
+      migrate: (persisted) => ({ ...(persisted as object), level: "word", streak: 0 }),
       partialize: (state) => ({
         enabled: state.enabled,
         level: state.level,
+        streak: state.streak,
+        leveledUpTo: state.leveledUpTo,
         byThread: state.byThread,
       }),
     },
@@ -162,7 +186,15 @@ export async function generateCodeExercise(
     activeId: exercise.id,
     entries: [
       ...thread.entries,
-      { exercise, answer: "", review: null, attempts: 0, revealed: false, hintShown: false },
+      {
+        exercise,
+        answer: "",
+        review: null,
+        attempts: 0,
+        revealed: false,
+        hintShown: false,
+        practising: (exercise.walkthrough?.length ?? 0) === 0,
+      },
     ].slice(-MAX_ENTRIES_PER_THREAD),
   }));
   setBusy(ref, null, null);
@@ -199,6 +231,9 @@ export async function reviewCodeExercise(
     review,
     attempts: current.attempts + 1,
   }));
+  if (review.verdict === "correct") {
+    recordMastery(entry.exercise.level, entry.attempts === 0 && !entry.hintShown);
+  }
   setBusy(ref, null, null);
 }
 
@@ -211,7 +246,36 @@ export function showExerciseHint(ref: ScopedThreadRef, exerciseId: string) {
 }
 
 export function revealExercise(ref: ScopedThreadRef, exerciseId: string) {
-  updateEntry(ref, exerciseId, (entry) => ({ ...entry, revealed: true }));
+  const entry = threadLearningOf(useCodeLearningStore.getState(), ref).entries.find(
+    (candidate) => candidate.exercise.id === exerciseId,
+  );
+  updateEntry(ref, exerciseId, (current) => ({ ...current, revealed: true }));
+  if (entry) recordMastery(entry.exercise.level, false);
+}
+
+export function startPractising(ref: ScopedThreadRef, exerciseId: string) {
+  updateEntry(ref, exerciseId, (entry) => ({ ...entry, practising: true }));
+}
+
+/**
+ * Counts a finished exercise towards mastering the current level. Only exercises made on the current level count,
+ * so finishing an old exercise from the history does not move anything.
+ */
+export function masteryAfter(
+  state: { readonly level: CodeLearningLevel; readonly streak: number },
+  exerciseLevel: CodeLearningLevel,
+  firstTry: boolean,
+): { level?: CodeLearningLevel; streak?: number; leveledUpTo?: CodeLearningLevel } {
+  if (exerciseLevel !== state.level) return {};
+  if (!firstTry) return { streak: 0 };
+  const streak = state.streak + 1;
+  const next = CODE_LEARNING_LEVELS[CODE_LEARNING_LEVELS.indexOf(state.level) + 1];
+  if (streak < MASTERY_STREAK || next === undefined) return { streak };
+  return { level: next, streak: 0, leveledUpTo: next };
+}
+
+function recordMastery(exerciseLevel: CodeLearningLevel, firstTry: boolean) {
+  useCodeLearningStore.setState((state) => masteryAfter(state, exerciseLevel, firstTry));
 }
 
 export function setActiveExercise(ref: ScopedThreadRef, exerciseId: string | null) {

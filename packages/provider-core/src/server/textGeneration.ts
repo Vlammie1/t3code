@@ -96,7 +96,7 @@ export type ReviewGuideGenerationResult = Omit<
 export interface CodeExerciseGenerationInput {
   cwd: string;
   diffPatch: string;
-  level: "fill" | "line" | "block";
+  level: "word" | "fill" | "line" | "block";
   avoid: ReadonlyArray<string>;
   modelSelection: ModelSelection;
 }
@@ -108,6 +108,7 @@ export interface CodeExerciseGenerationResult {
   before: string;
   solution: string;
   after: string;
+  walkthrough: ReadonlyArray<{ code: string; explanation: string }>;
   task: string;
   hint: string;
   explanation: string;

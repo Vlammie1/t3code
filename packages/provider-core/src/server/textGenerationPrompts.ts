@@ -451,6 +451,11 @@ export function buildThreadTitlePrompt(input: ThreadTitlePromptInput) {
 }
 
 const CODE_EXERCISE_LEVEL_RULES = {
+  word: [
+    "- hide exactly one word: a variable or function name, a keyword such as return or if, or a value such as true or a number (2 to 20 characters, no spaces)",
+    "- pick a word the walkthrough makes easy to work out, on a line a beginner can follow",
+    "- the rest of that line stays visible: put the visible start of the line at the end of 'before' and the visible end at the start of 'after', with no newline between them and the hidden part",
+  ],
   fill: [
     "- hide a small part of one line: an expression, a function call, a condition or a value (roughly 2 to 25 characters)",
     "- the rest of that line stays visible: put the visible start of the line at the end of 'before' and the visible end at the start of 'after', with no newline between them and the hidden part",
@@ -467,7 +472,7 @@ const CODE_EXERCISE_LEVEL_RULES = {
 
 export interface CodeExercisePromptInput {
   diffPatch: string;
-  level: "fill" | "line" | "block";
+  level: "word" | "fill" | "line" | "block";
   avoid: ReadonlyArray<string>;
 }
 
@@ -476,16 +481,19 @@ export function buildCodeExercisePrompt(input: CodeExercisePromptInput) {
   const prompt = [
     "You make a short coding exercise for a beginner who is learning to code by watching an AI agent build software.",
     "Below is the diff of what the agent just changed. Pick one meaningful piece of ADDED code (lines starting with '+') and hide part of it; the learner types the hidden part back.",
-    "Return a JSON object with keys: summary, filePath, language, before, solution, after, task, hint, explanation.",
+    "Return a JSON object with keys: summary, filePath, language, before, solution, after, walkthrough, task, hint, explanation.",
     "Rules:",
-    "- write summary, task, hint and explanation in Dutch, in plain words for someone who cannot code yet; explain any term you use",
+    "- write summary, walkthrough, task, hint and explanation in Dutch, in plain words for someone who cannot code yet; explain any term you use",
     "- summary: 1 to 2 sentences about what was built in this change and what this piece of code does in it",
     "- filePath: the path of the file as it appears in the diff",
     "- language: the language of that file in lowercase, such as typescript, tsx, python, css, sql, bash, json, markdown",
     "- prefer code with logic a beginner can reason about; avoid imports, long strings, generated code, lockfiles and pure formatting",
     ...CODE_EXERCISE_LEVEL_RULES[input.level],
     "- copy code exactly as it appears in the new version of the file, without the diff's leading '+' or ' ' markers",
-    "- before: 6 to 15 lines of code right above the hidden part; after: 4 to 12 lines right below it; never more than the diff shows",
+    "- before: 3 to 10 lines of code right above the hidden part; after: 2 to 8 lines right below it; never more than the diff shows",
+    "- walkthrough: the learner reads this BEFORE filling in; 3 to 6 steps that go through the shown code from top to bottom",
+    "- each walkthrough step has 'code': a short quote of the line it is about (at most one line, copied exactly), and 'explanation': 1 or 2 plain sentences on what that line does and why",
+    "- the step about the hidden part has an empty 'code' and explains what has to go there in words, without writing the hidden code itself",
     "- solution: only the hidden code, exactly as written in the file",
     "- task: one sentence that says what the hidden code must do, without giving it away",
     "- hint: one helpful nudge, such as which function or variable to use, still without the answer",
@@ -498,7 +506,7 @@ export function buildCodeExercisePrompt(input: CodeExercisePromptInput) {
       : []),
     "",
     "Diff:",
-    limitSection(input.diffPatch, 60_000),
+    limitSection(input.diffPatch, 20_000),
   ].join("\n");
 
   const outputSchema = Schema.Struct({
@@ -508,6 +516,7 @@ export function buildCodeExercisePrompt(input: CodeExercisePromptInput) {
     before: Schema.String,
     solution: Schema.String,
     after: Schema.String,
+    walkthrough: Schema.Array(Schema.Struct({ code: Schema.String, explanation: Schema.String })),
     task: Schema.String,
     hint: Schema.String,
     explanation: Schema.String,

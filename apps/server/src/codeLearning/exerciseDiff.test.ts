@@ -3,6 +3,7 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   addedCodeOf,
   diffContainsCode,
+  focusDiff,
   keepCodeFiles,
   undoOverEscapedCode,
 } from "./exerciseDiff.ts";
@@ -83,5 +84,16 @@ describe("undoOverEscapedCode", () => {
   it("leaves code with real line breaks alone, including a backslash-n inside a string", () => {
     const fields = { before: 'const line = "a\\nb";\n', solution: "x", after: "\n}" };
     expect(undoOverEscapedCode(fields)).toBe(fields);
+  });
+});
+
+describe("focusDiff", () => {
+  it("keeps the file with the most new code first and leaves out what does not fit", () => {
+    const focused = focusDiff(lockfile + sourceFile, sourceFile.length + 10);
+    expect(focused).toBe(sourceFile);
+  });
+
+  it("cuts a single file that is larger than the budget", () => {
+    expect(focusDiff(sourceFile, 40)).toBe(sourceFile.slice(0, 40));
   });
 });

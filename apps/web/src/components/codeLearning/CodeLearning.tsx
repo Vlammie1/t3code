@@ -6,6 +6,8 @@ import { useContext, useEffect } from "react";
 
 import { BookOpenIcon, PanelRightIcon, XIcon } from "~/components/appIcons";
 import {
+  CODE_LEARNING_LEVELS,
+  MASTERY_STREAK,
   claimRunForExercise,
   clearCodeLearningError,
   generateCodeExercise,
@@ -181,6 +183,7 @@ export function CodeLearningPanel(props: { readonly threadRef: ScopedThreadRef }
   const { thread, busy, error } = useThreadLearning(threadRef);
   const enabled = useCodeLearningStore((state) => state.enabled);
   const level = useCodeLearningStore((state) => state.level);
+  const streak = useCodeLearningStore((state) => state.streak);
   const shown =
     thread.entries.find((entry) => entry.exercise.id === thread.activeId) ??
     thread.entries.at(-1) ??
@@ -199,18 +202,24 @@ export function CodeLearningPanel(props: { readonly threadRef: ScopedThreadRef }
           className="w-full *:flex-1"
           value={[level]}
           onValueChange={(next) => {
-            const value = next[0];
-            if (value === "fill" || value === "line" || value === "block") {
-              useCodeLearningStore.getState().setLevel(value);
-            }
+            const value = CODE_LEARNING_LEVELS.find((candidate) => candidate === next[0]);
+            if (value !== undefined) useCodeLearningStore.getState().setLevel(value);
           }}
         >
-          {(["fill", "line", "block"] as const).map((value) => (
+          {CODE_LEARNING_LEVELS.map((value) => (
             <Toggle key={value} value={value}>
               {LEVEL_LABELS[value]}
             </Toggle>
           ))}
         </ToggleGroup>
+        {level === CODE_LEARNING_LEVELS.at(-1) ? null : (
+          <p className="text-xs text-muted-foreground">
+            <span className="text-foreground tabular-nums">
+              {streak} van {MASTERY_STREAK}
+            </span>{" "}
+            in één keer goed, zonder hint. Dan ga je vanzelf een niveau omhoog.
+          </p>
+        )}
         <label className="flex items-center justify-between gap-3 text-xs text-foreground">
           Na elke beurt een oefening
           <Switch

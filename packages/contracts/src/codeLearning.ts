@@ -7,9 +7,10 @@ import { IsoDateTime, NonNegativeInt, ThreadId } from "./baseSchemas.ts";
  * user to write back. A separate model call, not the thread's agent, reviews the attempt, so practising costs a
  * small text generation instead of the thread's context.
  *
- * The level sets how much is hidden: an expression or a few tokens, one whole line, or a block of lines.
+ * The level sets how much is hidden: one word, an expression, one whole line, or a block of lines. The learner moves
+ * up a level after a few exercises right at the first try.
  */
-export const CodeLearningLevel = Schema.Literals(["fill", "line", "block"]);
+export const CodeLearningLevel = Schema.Literals(["word", "fill", "line", "block"]);
 export type CodeLearningLevel = typeof CodeLearningLevel.Type;
 
 export const CodeExercise = Schema.Struct({
@@ -29,6 +30,13 @@ export const CodeExercise = Schema.Struct({
   solution: Schema.String,
   /** The code right below the hidden part, unchanged. */
   after: Schema.String,
+  /**
+   * Read before filling in: the shown code line by line in plain words. The step about the hidden part has no code.
+   * Absent on exercises made before walkthroughs existed.
+   */
+  walkthrough: Schema.optionalKey(
+    Schema.Array(Schema.Struct({ code: Schema.String, explanation: Schema.String })),
+  ),
   /** What the user has to write, as a short task. */
   task: Schema.String,
   hint: Schema.String,
@@ -55,7 +63,7 @@ export const CodeLearningInput = Schema.Union([
     level: CodeLearningLevel,
     /**
      * "latest" only uses the newest turn and fails when it wrote no code, which is what an exercise after each turn
-     * wants; "any" walks back through recent turns and then the whole thread.
+     * wants; "any" walks back through the last few turns.
      */
     scope: Schema.Literals(["latest", "any"]),
     /** Solutions of earlier exercises, so a new one picks other code. */

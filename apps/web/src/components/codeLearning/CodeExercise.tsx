@@ -11,8 +11,10 @@ import {
   RefreshCwIcon,
 } from "~/components/appIcons";
 import {
+  CODE_LEARNING_LEVELS,
   generateCodeExercise,
   revealExercise,
+  startPractising,
   reviewCodeExercise,
   setExerciseAnswer,
   showExerciseHint,
@@ -25,7 +27,8 @@ import { ScrollArea } from "../ui/scroll-area";
 import { ExerciseCode } from "./ExerciseCode";
 
 export const LEVEL_LABELS: Record<CodeLearningLevel, string> = {
-  fill: "Invullen",
+  word: "Eén woord",
+  fill: "Stukje regel",
   line: "Een regel",
   block: "Een blok",
 };
@@ -63,6 +66,8 @@ export function CodeExerciseView(props: {
   const busy = useThreadBusy(threadRef);
   const solved = entry.review?.verdict === "correct";
   const finished = solved || entry.revealed;
+  const walkthrough = exercise.walkthrough ?? [];
+  const explaining = !finished && entry.practising === false && walkthrough.length > 0;
   const canSubmit = busy === null && !finished && entry.answer.trim().length > 0;
   const file = fileLabel(exercise.filePath);
   const verdict = entry.review ? VERDICT_STYLES[entry.review.verdict] : null;
@@ -78,7 +83,15 @@ export function CodeExerciseView(props: {
   };
   const onAnswer = (answer: string) => setExerciseAnswer(threadRef, exercise.id, answer);
 
-  const field = finished ? null : exercise.level === "fill" ? (
+  const field = finished ? null : explaining ? (
+    <span
+      aria-label="Het lege stuk"
+      style={{ width: `${Math.max(exercise.solution.length + 3, 6)}ch` }}
+      className="inline-block rounded-sm border border-dashed border-primary/50 bg-primary/10 align-bottom"
+    >
+      {" "}
+    </span>
+  ) : exercise.level === "fill" || exercise.level === "word" ? (
     <input
       aria-label="Jouw code voor het lege stuk"
       value={entry.answer}
@@ -119,6 +132,7 @@ export function CodeExerciseView(props: {
 
   return (
     <div className="flex min-w-0 flex-col gap-2 text-xs/5">
+      <LevelUpNotice />
       <p className="text-foreground">{exercise.summary}</p>
       <div className="flex min-w-0 flex-col overflow-hidden rounded-xl bg-foreground/5">
         <div className="flex min-w-0 items-center gap-2 px-3 pt-2 pb-1">
@@ -137,10 +151,39 @@ export function CodeExerciseView(props: {
           {code}
         </ScrollArea>
       </div>
-      <p className="text-foreground">
-        <span className="font-medium">Opdracht: </span>
-        {exercise.task}
-      </p>
+      {explaining ? (
+        <ScrollArea
+          scrollFade
+          className={cn("h-auto", compact ? "max-h-[min(14rem,30dvh)]" : "max-h-none")}
+        >
+          <ol className="flex flex-col gap-1.5">
+            {walkthrough.map((step, index) => (
+              // Steps are fixed once made and only ever shown in this order.
+              // oxlint-disable-next-line react/no-array-index-key
+              <li key={index} className="flex gap-2">
+                <span className="w-4 shrink-0 text-end text-muted-foreground tabular-nums">
+                  {index + 1}.
+                </span>
+                <span className="flex min-w-0 flex-col">
+                  {step.code ? (
+                    <code className="min-w-0 truncate font-mono text-2xs text-muted-foreground">
+                      {step.code}
+                    </code>
+                  ) : (
+                    <span className="text-2xs text-primary">Het lege stuk</span>
+                  )}
+                  <span className="text-foreground">{step.explanation}</span>
+                </span>
+              </li>
+            ))}
+          </ol>
+        </ScrollArea>
+      ) : (
+        <p className="text-foreground">
+          <span className="font-medium">Opdracht: </span>
+          {exercise.task}
+        </p>
+      )}
       {entry.hintShown && !finished ? (
         <p className="flex gap-1.5 text-muted-foreground">
           <LightbulbIcon className="mt-0.5 size-3.5 shrink-0" />
@@ -156,13 +199,19 @@ export function CodeExerciseView(props: {
       ) : null}
       {finished ? <p className="text-muted-foreground">{exercise.explanation}</p> : null}
       <div className="flex flex-wrap items-center gap-1">
-        {finished ? null : (
+        {explaining ? (
+          <Button size="xs" onClick={() => startPractising(threadRef, exercise.id)}>
+            <CheckIcon />
+            Ik snap het, nu invullen
+          </Button>
+        ) : null}
+        {finished || explaining ? null : (
           <Button size="xs" disabled={!canSubmit} onClick={submit}>
             <CheckIcon />
             {busy === "reviewing" ? "Nakijken…" : "Nakijken"}
           </Button>
         )}
-        {finished || entry.hintShown ? null : (
+        {finished || explaining || entry.hintShown ? null : (
           <Button
             size="xs"
             variant="ghost"
@@ -172,7 +221,7 @@ export function CodeExerciseView(props: {
             Hint
           </Button>
         )}
-        {finished ? null : (
+        {finished || explaining ? null : (
           <Button size="xs" variant="ghost" onClick={() => revealExercise(threadRef, exercise.id)}>
             <EyeIcon />
             Antwoord tonen
@@ -213,6 +262,29 @@ export function CodeLearningEmpty(props: { readonly threadRef: ScopedThreadRef }
       >
         <RefreshCwIcon />
         {busy === "generating" ? "Oefening maken…" : "Maak een oefening"}
+      </Button>
+    </div>
+  );
+}
+
+/** Shown once after the learner mastered a level, wherever the next exercise appears. */
+function LevelUpNotice() {
+  const leveledUpTo = useCodeLearningStore((state) => state.leveledUpTo);
+  if (leveledUpTo === null) return null;
+  const previous = CODE_LEARNING_LEVELS[CODE_LEARNING_LEVELS.indexOf(leveledUpTo) - 1];
+  return (
+    <div className="flex items-center gap-2 rounded-xl bg-success/8 px-3 py-2 text-success-foreground">
+      <CheckIcon className="size-3.5 shrink-0" />
+      <span className="min-w-0 flex-1">
+        {previous ? `${LEVEL_LABELS[previous]} beheers je. ` : ""}
+        Vanaf nu: {LEVEL_LABELS[leveledUpTo].toLowerCase()}.
+      </span>
+      <Button
+        size="xs"
+        variant="ghost"
+        onClick={() => useCodeLearningStore.getState().dismissLevelUp()}
+      >
+        Oké
       </Button>
     </div>
   );

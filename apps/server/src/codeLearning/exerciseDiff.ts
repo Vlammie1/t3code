@@ -22,6 +22,23 @@ export function keepCodeFiles(diff: string): string {
     .join("");
 }
 
+/**
+ * The changed files with the most new code, up to `maxChars`. One file is enough for an exercise, and a big turn
+ * otherwise sends the model tens of thousands of characters it only skims, which mostly costs waiting time.
+ */
+export function focusDiff(diff: string, maxChars: number): string {
+  const ranked = fileSections(diff)
+    .map((section) => ({ section, added: addedCodeOf(section).length }))
+    .filter((file) => file.added > 0)
+    .toSorted((left, right) => right.added - left.added);
+  let focused = "";
+  for (const { section } of ranked) {
+    if (focused.length === 0) focused = section.slice(0, maxChars);
+    else if (focused.length + section.length <= maxChars) focused += section;
+  }
+  return focused;
+}
+
 /** Every added line of the diff, without its `+` marker. */
 export function addedCodeOf(diff: string): string {
   return diff
