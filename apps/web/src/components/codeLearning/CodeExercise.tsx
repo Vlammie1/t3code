@@ -22,6 +22,7 @@ import {
 import { cn } from "~/lib/utils";
 import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
+import { ExerciseCode } from "./ExerciseCode";
 
 export const LEVEL_LABELS: Record<CodeLearningLevel, string> = {
   fill: "Invullen",
@@ -77,9 +78,7 @@ export function CodeExerciseView(props: {
   };
   const onAnswer = (answer: string) => setExerciseAnswer(threadRef, exercise.id, answer);
 
-  const hiddenPart = finished ? (
-    <mark className="rounded-sm bg-success/16 px-0.5 text-foreground">{exercise.solution}</mark>
-  ) : exercise.level === "fill" ? (
+  const field = finished ? null : exercise.level === "fill" ? (
     <input
       aria-label="Jouw code voor het lege stuk"
       value={entry.answer}
@@ -107,9 +106,14 @@ export function CodeExerciseView(props: {
 
   const code = (
     <pre className="min-w-max px-3 py-2 font-mono text-xs/5 text-foreground/75">
-      {exercise.before}
-      {hiddenPart}
-      {exercise.after}
+      <ExerciseCode
+        before={exercise.before}
+        solution={exercise.solution}
+        after={exercise.after}
+        language={exercise.language}
+        field={field}
+        solutionClassName="rounded-sm bg-success/16"
+      />
     </pre>
   );
 

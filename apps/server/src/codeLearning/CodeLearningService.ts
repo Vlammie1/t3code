@@ -1,5 +1,7 @@
 import {
   CodeLearningError,
+  ProviderInstanceId,
+  type ServerSettings as ServerSettingsValue,
   type CodeExercise,
   type CodeLearningInput,
   type CodeLearningLevel,
@@ -11,6 +13,7 @@ import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import { createModelSelection } from "@t3tools/shared/model";
 
 import * as CheckpointDiffQuery from "../checkpointing/CheckpointDiffQuery.ts";
 import * as ThreadManagement from "../orchestration-v2/ThreadManagementService.ts";
@@ -24,8 +27,10 @@ import {
 } from "./exerciseDiff.ts";
 
 /**
- * Code leren: an exercise from the code a thread's agent just wrote, and a review of the user's attempt. Both run on
- * the text generation model, never on the thread's own agent, so practising does not spend the thread's context.
+ * Code leren: an exercise from the code a thread's agent just wrote, and a review of the user's attempt. Neither runs
+ * on the thread's own agent, so practising does not spend the thread's context. The exercise comes from the text
+ * generation model; the review from Sonnet on low effort when a Claude instance exists, because judging whether
+ * a beginner's code works the same is where a small model slips.
  */
 export class CodeLearningService extends Context.Service<
   CodeLearningService,
@@ -38,6 +43,28 @@ export class CodeLearningService extends Context.Service<
 
 /** Earlier turns are tried when the newest one only touched files that make poor exercises. */
 const MAX_TURNS_BACK = 5;
+
+const REVIEW_MODEL = "claude-sonnet-5-5";
+const CLAUDE_DRIVER = "claudeAgent";
+
+/** Sonnet on the first Claude instance, preferring the one text generation already uses. */
+export function reviewModelSelection(settings: ServerSettingsValue) {
+  const textGeneration = settings.textGenerationModelSelection;
+  const instances: Readonly<Record<string, { readonly driver: string }>> =
+    settings.providerInstances;
+  const isClaude = (id: string) => (instances[id]?.driver ?? id) === CLAUDE_DRIVER;
+  const candidates = [
+    textGeneration.instanceId,
+    settings.defaultModelSelection?.instanceId,
+    ...Object.keys(instances),
+  ].filter((id) => id !== undefined);
+  const instanceId = candidates.find(isClaude);
+  return instanceId === undefined
+    ? textGeneration
+    : createModelSelection(ProviderInstanceId.make(instanceId), REVIEW_MODEL, [
+        { id: "effort", value: "low" },
+      ]);
+}
 
 const failWith = (detail: string) => (cause: unknown) => new CodeLearningError({ detail, cause });
 
@@ -192,7 +219,11 @@ const make = Effect.gen(function* () {
         after: exercise.after,
         task: exercise.task,
         answer,
-        modelSelection: yield* modelSelection,
+        modelSelection: reviewModelSelection(
+          yield* settings.getSettings.pipe(
+            Effect.mapError(failWith("De instellingen zijn niet te lezen.")),
+          ),
+        ),
       })
       .pipe(
         Effect.mapError(
